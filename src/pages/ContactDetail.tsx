@@ -6,6 +6,8 @@ import { CategoryBadge, type CategoryType } from "@/components/ui/CategoryBadge"
 import { GlassCard } from "@/components/ui/GlassCard";
 import { EditContactModal } from "@/components/contacts/EditContactModal";
 import { useToast } from "@/hooks/use-toast";
+import { exportToPhoneContacts } from "@/lib/export-utils";
+import { toast as sonnerToast } from "sonner";
 import {
   ArrowLeft,
   Building2,
@@ -18,6 +20,7 @@ import {
   Loader2,
   FileText,
   Globe,
+  Share2,
 } from "lucide-react";
 
 interface Contact {
@@ -144,6 +147,18 @@ export default function ContactDetail() {
           <ArrowLeft className="h-5 w-5" />
         </button>
         <div className="flex gap-2">
+          <button 
+            onClick={async () => {
+              const success = await exportToPhoneContacts(contact);
+              if (success) {
+                sonnerToast.success("Contact ready to save to your phone");
+              }
+            }}
+            className="p-2.5 rounded-xl glass-button"
+            title="Save to phone contacts"
+          >
+            <Share2 className="h-5 w-5" />
+          </button>
           <button 
             onClick={() => setIsEditModalOpen(true)}
             className="p-2.5 rounded-xl glass-button"

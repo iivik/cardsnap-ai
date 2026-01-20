@@ -29,7 +29,7 @@ export function RoleBreakdown({ data, contacts = [], onContactClick }: RoleBreak
   const [search, setSearch] = useState("");
   const [sortMode, setSortMode] = useState<SortMode>("count");
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
-  const [expandedTitles, setExpandedTitles] = useState<Set<string>>(new Set());
+  const [expandedTitle, setExpandedTitle] = useState<string | null>(null);
 
   const toggleGroup = (group: string) => {
     setExpandedGroups(prev => {
@@ -45,15 +45,8 @@ export function RoleBreakdown({ data, contacts = [], onContactClick }: RoleBreak
 
   const toggleTitle = (title: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    setExpandedTitles(prev => {
-      const next = new Set(prev);
-      if (next.has(title)) {
-        next.delete(title);
-      } else {
-        next.add(title);
-      }
-      return next;
-    });
+    // Single expansion: close current if same, otherwise switch to new
+    setExpandedTitle(prev => prev === title ? null : title);
   };
 
   // Get contacts for a specific title
@@ -140,7 +133,7 @@ export function RoleBreakdown({ data, contacts = [], onContactClick }: RoleBreak
               <CollapsibleContent>
                 <div className="pl-6 pr-3 py-2 space-y-1">
                   {group.titles.map(title => {
-                    const isTitleExpanded = expandedTitles.has(title.title);
+                    const isTitleExpanded = expandedTitle === title.title;
                     const titleContacts = getContactsForTitle(title.title);
 
                     return (

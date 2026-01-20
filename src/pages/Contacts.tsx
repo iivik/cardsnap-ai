@@ -5,7 +5,10 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { ContactCard } from "@/components/contacts/ContactCard";
 import { EmptyState } from "@/components/contacts/EmptyState";
 import { supabase } from "@/integrations/supabase/client";
-import { Search, Filter, Loader2 } from "lucide-react";
+import { exportMultipleToPhone } from "@/lib/export-utils";
+import { toast } from "sonner";
+import { Search, Filter, Loader2, Share2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import type { CategoryType } from "@/components/ui/CategoryBadge";
 
 interface Contact {
@@ -99,15 +102,44 @@ export default function Contacts() {
 
   if (!user) return null;
 
+  const handleExportFiltered = async () => {
+    if (filteredContacts.length === 0) return;
+    
+    // Map to export format
+    const exportData = filteredContacts.map(c => ({
+      name: c.name,
+      title: c.title,
+      company: c.company,
+      email: c.email,
+      phone: c.phone,
+    }));
+
+    const success = await exportMultipleToPhone(exportData);
+    if (success) {
+      toast.success(`${filteredContacts.length} contacts ready to save`);
+    }
+  };
+
   return (
     <AppLayout>
       <div className="p-6 space-y-6">
         {/* Header */}
-        <header className="animate-fade-in">
-          <h1 className="text-2xl font-bold tracking-tight text-foreground">Contacts</h1>
-          <p className="text-muted-foreground">
-            {contacts.length} contact{contacts.length !== 1 ? "s" : ""} in your CRM
-          </p>
+        <header className="animate-fade-in flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight text-foreground">Contacts</h1>
+            <p className="text-muted-foreground">
+              {contacts.length} contact{contacts.length !== 1 ? "s" : ""} in your CRM
+            </p>
+          </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={handleExportFiltered}
+            disabled={filteredContacts.length === 0 || loading}
+            title="Export filtered contacts"
+          >
+            <Share2 className="h-5 w-5" />
+          </Button>
         </header>
 
         {/* Search & Filter */}
