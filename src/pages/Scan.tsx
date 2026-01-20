@@ -166,8 +166,7 @@ export default function Scan() {
     error: cameraError,
     isLoading: cameraLoading,
     hasMultipleCameras,
-    torchSupported,
-    torchOn,
+    flashMode,
     isCardDetected,
     isCountingDown,
     countdown,
@@ -175,7 +174,8 @@ export default function Scan() {
     startCamera,
     stopCamera,
     flipCamera,
-    toggleTorch,
+    cycleFlashMode,
+    applyTorch,
     toggleMute,
     captureImage,
     playShutterSound,
@@ -220,6 +220,12 @@ export default function Scan() {
     // Trigger flash and sound
     triggerFlash();
     playShutterSound();
+    
+    // Flash the torch for 'auto' mode
+    if (flashMode === 'auto') {
+      applyTorch(true);
+      setTimeout(() => applyTorch(false), 200);
+    }
 
     try {
       // Capture image from video
@@ -252,7 +258,7 @@ export default function Scan() {
       toast.error("Failed to capture image. Please try again.");
       setIsCapturing(false);
     }
-  }, [isCapturing, user, captureImage, stopCamera, navigate, triggerFlash, playShutterSound, isBatchMode, capturedCards.length, uploadCardImage, locationData]);
+  }, [isCapturing, user, captureImage, stopCamera, navigate, triggerFlash, playShutterSound, flashMode, applyTorch, isBatchMode, capturedCards.length, uploadCardImage, locationData]);
 
   const handleRemoveCard = useCallback((index: number) => {
     setCapturedCards(prev => prev.filter((_, i) => i !== index));
@@ -379,10 +385,9 @@ export default function Scan() {
           <CameraControls
             onCancel={handleCancel}
             onFlip={flipCamera}
-            onToggleTorch={toggleTorch}
+            onCycleFlashMode={cycleFlashMode}
             onToggleMute={toggleMute}
-            torchOn={torchOn}
-            torchSupported={torchSupported}
+            flashMode={flashMode}
             hasMultipleCameras={hasMultipleCameras}
             isMuted={isMuted}
             isCapturing={isCapturing}

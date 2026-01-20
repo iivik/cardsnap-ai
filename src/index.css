@@ -240,12 +240,16 @@
     box-shadow: 0 0 0 3px hsl(var(--primary) / 0.2);
   }
 
-  /* Bottom navigation */
+  /* Bottom navigation - theme aware */
   .bottom-nav {
     @apply fixed bottom-0 left-0 right-0 backdrop-blur-2xl border-t;
-    background: rgba(15, 23, 42, 0.8);
+    background: rgba(255, 255, 255, 0.85);
     border-color: var(--glass-border);
     padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .dark .bottom-nav {
+    background: rgba(15, 23, 42, 0.85);
   }
 
   /* Category badges */
