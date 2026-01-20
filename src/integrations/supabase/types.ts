@@ -92,14 +92,219 @@ export type Database = {
         }
         Relationships: []
       }
+      profiles: {
+        Row: {
+          created_at: string
+          email: string | null
+          id: string
+          promo_code_used: string | null
+          razorpay_customer_id: string | null
+          razorpay_subscription_id: string | null
+          scan_credits: number
+          subscription_currency: string
+          subscription_status: Database["public"]["Enums"]["subscription_status"]
+          subscription_tier: Database["public"]["Enums"]["subscription_tier"]
+          total_scans_used: number
+          trial_ends_at: string | null
+          trial_started_at: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          email?: string | null
+          id?: string
+          promo_code_used?: string | null
+          razorpay_customer_id?: string | null
+          razorpay_subscription_id?: string | null
+          scan_credits?: number
+          subscription_currency?: string
+          subscription_status?: Database["public"]["Enums"]["subscription_status"]
+          subscription_tier?: Database["public"]["Enums"]["subscription_tier"]
+          total_scans_used?: number
+          trial_ends_at?: string | null
+          trial_started_at?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          email?: string | null
+          id?: string
+          promo_code_used?: string | null
+          razorpay_customer_id?: string | null
+          razorpay_subscription_id?: string | null
+          scan_credits?: number
+          subscription_currency?: string
+          subscription_status?: Database["public"]["Enums"]["subscription_status"]
+          subscription_tier?: Database["public"]["Enums"]["subscription_tier"]
+          total_scans_used?: number
+          trial_ends_at?: string | null
+          trial_started_at?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      promo_codes: {
+        Row: {
+          code: string
+          created_at: string
+          created_by: string | null
+          current_uses: number
+          discount_type: Database["public"]["Enums"]["discount_type"]
+          discount_value: number
+          free_scans_bonus: number
+          id: string
+          is_active: boolean
+          max_uses: number | null
+          valid_from: string
+          valid_until: string | null
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          created_by?: string | null
+          current_uses?: number
+          discount_type: Database["public"]["Enums"]["discount_type"]
+          discount_value?: number
+          free_scans_bonus?: number
+          id?: string
+          is_active?: boolean
+          max_uses?: number | null
+          valid_from?: string
+          valid_until?: string | null
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          created_by?: string | null
+          current_uses?: number
+          discount_type?: Database["public"]["Enums"]["discount_type"]
+          discount_value?: number
+          free_scans_bonus?: number
+          id?: string
+          is_active?: boolean
+          max_uses?: number | null
+          valid_from?: string
+          valid_until?: string | null
+        }
+        Relationships: []
+      }
+      user_categories: {
+        Row: {
+          created_at: string
+          id: string
+          is_default: boolean
+          is_hidden: boolean
+          is_system: boolean
+          label: string
+          sort_order: number
+          updated_at: string
+          user_id: string
+          value: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_default?: boolean
+          is_hidden?: boolean
+          is_system?: boolean
+          label: string
+          sort_order?: number
+          updated_at?: string
+          user_id: string
+          value: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_default?: boolean
+          is_hidden?: boolean
+          is_system?: boolean
+          label?: string
+          sort_order?: number
+          updated_at?: string
+          user_id?: string
+          value?: string
+        }
+        Relationships: []
+      }
+      user_meeting_contexts: {
+        Row: {
+          created_at: string
+          id: string
+          is_default: boolean
+          is_hidden: boolean
+          is_system: boolean
+          label: string
+          sort_order: number
+          updated_at: string
+          user_id: string
+          value: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_default?: boolean
+          is_hidden?: boolean
+          is_system?: boolean
+          label: string
+          sort_order?: number
+          updated_at?: string
+          user_id: string
+          value: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_default?: boolean
+          is_hidden?: boolean
+          is_system?: boolean
+          label?: string
+          sort_order?: number
+          updated_at?: string
+          user_id?: string
+          value?: string
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
+      app_role: "admin" | "user"
       contact_category_type:
         | "client"
         | "prospect_client"
@@ -107,12 +312,20 @@ export type Database = {
         | "partner"
         | "influencer"
         | "random"
+      discount_type: "free_month" | "percentage_off" | "free_scans"
       meeting_context_type:
         | "office_my"
         | "office_client"
         | "office_partner"
         | "event"
         | "other"
+      subscription_status:
+        | "none"
+        | "trialing"
+        | "active"
+        | "canceled"
+        | "expired"
+      subscription_tier: "free" | "pro" | "business"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -240,6 +453,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      app_role: ["admin", "user"],
       contact_category_type: [
         "client",
         "prospect_client",
@@ -248,6 +462,7 @@ export const Constants = {
         "influencer",
         "random",
       ],
+      discount_type: ["free_month", "percentage_off", "free_scans"],
       meeting_context_type: [
         "office_my",
         "office_client",
@@ -255,6 +470,14 @@ export const Constants = {
         "event",
         "other",
       ],
+      subscription_status: [
+        "none",
+        "trialing",
+        "active",
+        "canceled",
+        "expired",
+      ],
+      subscription_tier: ["free", "pro", "business"],
     },
   },
 } as const
