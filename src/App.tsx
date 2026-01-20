@@ -10,6 +10,7 @@ import Contacts from "./pages/Contacts";
 import ContactDetail from "./pages/ContactDetail";
 import Scan from "./pages/Scan";
 import Processing from "./pages/Processing";
+import Review from "./pages/Review";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 
@@ -29,6 +30,7 @@ const App = () => (
             <Route path="/contacts/:id" element={<ContactDetail />} />
             <Route path="/scan" element={<Scan />} />
             <Route path="/processing" element={<Processing />} />
+            <Route path="/review" element={<Review />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="*" element={<NotFound />} />
           </Routes>

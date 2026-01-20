@@ -16,6 +16,49 @@ export default function Scan() {
   const [isCapturing, setIsCapturing] = useState(false);
   const [cameraStarted, setCameraStarted] = useState(false);
 
+  const handleAutoCapture = useCallback(async (imageData: string) => {
+    if (isCapturing || !user) return;
+    
+    setIsCapturing(true);
+    try {
+      // Convert base64 to blob
+      const response = await fetch(imageData);
+      const blob = await response.blob();
+
+      // Generate unique filename
+      const filename = `${user.id}/${Date.now()}-card.jpg`;
+
+      // Upload to Supabase Storage
+      const { data, error } = await supabase.storage
+        .from("card-images")
+        .upload(filename, blob, {
+          contentType: "image/jpeg",
+          upsert: false,
+        });
+
+      if (error) {
+        throw error;
+      }
+
+      // Get public URL
+      const { data: urlData } = supabase.storage
+        .from("card-images")
+        .getPublicUrl(data.path);
+
+      // Stop camera before navigating
+      stopCamera();
+
+      // Navigate to processing page with image URL
+      navigate("/processing", {
+        state: { imageUrl: urlData.publicUrl, imagePath: data.path },
+      });
+    } catch (err) {
+      console.error("Auto-capture error:", err);
+      toast.error("Failed to capture image. Please try again.");
+      setIsCapturing(false);
+    }
+  }, [isCapturing, user, navigate]);
+
   const {
     videoRef,
     stream,
@@ -24,12 +67,19 @@ export default function Scan() {
     hasMultipleCameras,
     torchSupported,
     torchOn,
+    isCardDetected,
+    isCountingDown,
+    countdown,
     startCamera,
     stopCamera,
     flipCamera,
     toggleTorch,
     captureImage,
-  } = useCamera({ facingMode: "environment" });
+  } = useCamera({ 
+    facingMode: "environment",
+    enableAutoCapture: true,
+    onAutoCapture: handleAutoCapture,
+  });
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -177,7 +227,11 @@ export default function Scan() {
             isCapturing={isCapturing}
           />
 
-          <CameraOverlay />
+          <CameraOverlay 
+            isFocused={isCardDetected}
+            isCountingDown={isCountingDown}
+            countdown={countdown}
+          />
 
           <CaptureButton
             onCapture={handleCapture}
