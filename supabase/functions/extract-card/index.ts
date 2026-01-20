@@ -46,7 +46,13 @@ serve(async (req) => {
             content: [
               {
                 type: "text",
-                text: 'Extract all text from this business card image. Return JSON with: name, title, company, phone, email, address, handwritten_notes. Return empty string if field not found. Only return the JSON object, no markdown formatting.',
+                text: `Extract information from this business card image.
+
+PHONE FIELD INSTRUCTIONS: If multiple phone numbers are present, extract ONLY the mobile/cell number. Look for numbers marked as "M", "Mobile", "Cell", "Mob", or similar indicators. If no mobile number is clearly identified, use the most likely personal/direct number (not office landlines or fax numbers).
+
+Return a JSON object with these fields: name, title, company, phone (mobile only), email, address, notes.
+The "notes" field should contain any handwritten notes visible on the card.
+Return empty string if a field is not found. Only return the JSON object, no markdown formatting.`,
               },
               {
                 type: "image_url",
@@ -124,8 +130,14 @@ serve(async (req) => {
         phone: "",
         email: "",
         address: "",
-        handwritten_notes: "",
+        notes: "",
       };
+    }
+
+    // Normalize field names - handle both handwritten_notes and notes
+    if (extractedData.handwritten_notes !== undefined && extractedData.notes === undefined) {
+      extractedData.notes = extractedData.handwritten_notes;
+      delete extractedData.handwritten_notes;
     }
 
     console.log("Extracted data:", extractedData);

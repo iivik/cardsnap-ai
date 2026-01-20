@@ -62,7 +62,8 @@ interface ExtractedData {
   phone: string;
   email: string;
   address: string;
-  handwritten_notes: string;
+  notes: string;
+  handwritten_notes?: string; // Legacy support
 }
 
 interface LocationData {
@@ -97,7 +98,7 @@ export default function Review() {
     phone: "",
     email: "",
     address: "",
-    handwritten_notes: "",
+    notes: "",
   });
   const [category, setCategory] = useState<string>("random");
   const [meetingContext, setMeetingContext] = useState<string>("");
@@ -127,7 +128,12 @@ export default function Review() {
     }
 
     if (extractedData) {
-      setFormData(extractedData);
+      // Handle both notes and legacy handwritten_notes
+      const normalizedData = {
+        ...extractedData,
+        notes: extractedData.notes || extractedData.handwritten_notes || "",
+      };
+      setFormData(normalizedData);
     }
 
     // Use passed location or get fresh location
@@ -267,7 +273,7 @@ export default function Review() {
         phone: formData.phone.trim() || null,
         email: formData.email.trim(),
         address: formData.address.trim() || null,
-        handwritten_notes: formData.handwritten_notes.trim() || null,
+        handwritten_notes: formData.notes.trim() || null,
         category: category as "client" | "prospect_client" | "prospect_partner" | "partner" | "influencer" | "random",
         meeting_context: meetingContext as "office_my" | "office_client" | "office_partner" | "event" | "other",
         meeting_context_other: meetingContext === "other" ? meetingContextOther.trim() : null,
@@ -331,7 +337,7 @@ export default function Review() {
           phone: formData.phone.trim() || null,
           email: formData.email.trim(),
           address: formData.address.trim() || null,
-          handwritten_notes: formData.handwritten_notes.trim() || null,
+          handwritten_notes: formData.notes.trim() || null,
           category: category as "client" | "prospect_client" | "prospect_partner" | "partner" | "influencer" | "random",
           meeting_context: meetingContext as "office_my" | "office_client" | "office_partner" | "event" | "other",
           meeting_context_other: meetingContext === "other" ? meetingContextOther.trim() : null,
@@ -385,12 +391,13 @@ export default function Review() {
 
   return (
     <div className="fixed inset-0 bg-background flex flex-col">
-      {/* Card Image Preview - Top 30% */}
-      <div className="h-[30vh] relative flex-shrink-0 bg-black/50">
+      {/* Card Image Preview - Top 30% - Horizontal display */}
+      <div className="h-[30vh] relative flex-shrink-0 bg-black/50 flex items-center justify-center overflow-hidden">
         <img
           src={imageUrl}
           alt="Business card"
-          className="w-full h-full object-contain"
+          className="max-h-full object-contain"
+          style={{ maxWidth: '95%', aspectRatio: '1.75 / 1', objectFit: 'contain' }}
         />
         <div className="absolute inset-0 bg-gradient-to-b from-transparent to-background/80 pointer-events-none" />
         
@@ -516,21 +523,6 @@ export default function Review() {
             />
           </div>
 
-          {/* Handwritten Notes */}
-          <div className="space-y-2">
-            <Label htmlFor="notes" className="flex items-center gap-2 text-sm">
-              <StickyNote className="h-4 w-4 text-muted-foreground" />
-              Handwritten Notes
-            </Label>
-            <Textarea
-              id="notes"
-              value={formData.handwritten_notes}
-              onChange={(e) => handleChange("handwritten_notes", e.target.value)}
-              placeholder="Any notes from the card..."
-              rows={2}
-              className="bg-secondary/50 resize-none"
-            />
-          </div>
 
           {/* Location (Display Only) */}
           <div className="space-y-2">
@@ -616,6 +608,22 @@ export default function Review() {
               </SelectContent>
             </Select>
             {errors.category && <p className="text-xs text-destructive">{errors.category}</p>}
+          </div>
+
+          {/* Notes - Last field */}
+          <div className="space-y-2">
+            <Label htmlFor="notes" className="flex items-center gap-2 text-sm">
+              <StickyNote className="h-4 w-4 text-muted-foreground" />
+              Notes
+            </Label>
+            <Textarea
+              id="notes"
+              value={formData.notes}
+              onChange={(e) => handleChange("notes", e.target.value)}
+              placeholder="Notes from the card or your own observations..."
+              rows={3}
+              className="bg-secondary/50 resize-none"
+            />
           </div>
         </div>
       </ScrollArea>

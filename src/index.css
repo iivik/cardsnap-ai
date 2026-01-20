@@ -50,7 +50,7 @@
     --category-client: 160 84% 39%;
     --category-prospect: 38 92% 50%;
     --category-partner: 217 91% 60%;
-    --category-influencer: 271 81% 56%;
+    --category-influencer: 320 80% 65%;
     --category-random: 215 20% 65%;
     
     /* Action colors */
@@ -210,9 +210,9 @@
   }
 
   .badge-influencer {
-    background: hsl(var(--category-influencer) / 0.2);
-    color: hsl(var(--category-influencer));
-    border: 1px solid hsl(var(--category-influencer) / 0.3);
+    background: hsl(var(--category-influencer) / 0.25);
+    color: hsl(320 80% 80%);
+    border: 1px solid hsl(var(--category-influencer) / 0.4);
   }
 
   .badge-random {
