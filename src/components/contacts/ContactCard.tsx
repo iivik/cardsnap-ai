@@ -61,7 +61,7 @@ export function ContactCard({ contact, onClick }: ContactCardProps) {
             {contact.phone && (
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Phone className="h-4 w-4 flex-shrink-0" />
-                <span>{contact.phone}</span>
+                <span className="truncate">{contact.phone}</span>
               </div>
             )}
           </div>

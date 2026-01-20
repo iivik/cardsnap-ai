@@ -82,7 +82,7 @@ export function EditContactModal({ open, onClose, contact, onSave }: EditContact
     phone: "",
     email: "",
     address: "",
-    handwritten_notes: "",
+    notes: "",
   });
   const [category, setCategory] = useState<string>("random");
   const [meetingContext, setMeetingContext] = useState<string>("");
@@ -99,7 +99,7 @@ export function EditContactModal({ open, onClose, contact, onSave }: EditContact
         phone: contact.phone || "",
         email: contact.email || "",
         address: contact.address || "",
-        handwritten_notes: contact.handwritten_notes || "",
+        notes: contact.handwritten_notes || "",
       });
       setCategory(contact.category || "random");
       setMeetingContext(contact.meeting_context || "");
@@ -160,7 +160,7 @@ export function EditContactModal({ open, onClose, contact, onSave }: EditContact
           phone: formData.phone.trim() || null,
           email: formData.email.trim(),
           address: formData.address.trim() || null,
-          handwritten_notes: formData.handwritten_notes.trim() || null,
+          handwritten_notes: formData.notes.trim() || null,
           category: category as CategoryType,
           meeting_context: meetingContext as "office_my" | "office_client" | "office_partner" | "event" | "other",
           meeting_context_other: meetingContext === "other" ? meetingContextOther.trim() : null,
@@ -297,21 +297,6 @@ export function EditContactModal({ open, onClose, contact, onSave }: EditContact
               />
             </div>
 
-            {/* Handwritten Notes */}
-            <div className="space-y-2">
-              <Label htmlFor="edit-notes" className="flex items-center gap-2 text-sm">
-                <StickyNote className="h-4 w-4 text-muted-foreground" />
-                Handwritten Notes
-              </Label>
-              <Textarea
-                id="edit-notes"
-                value={formData.handwritten_notes}
-                onChange={(e) => handleChange("handwritten_notes", e.target.value)}
-                placeholder="Any notes from the card..."
-                rows={2}
-                className="bg-secondary/50 resize-none"
-              />
-            </div>
 
             {/* Location (Display Only) */}
             {locationDisplay && (
@@ -390,6 +375,22 @@ export function EditContactModal({ open, onClose, contact, onSave }: EditContact
                 </SelectContent>
               </Select>
               {errors.category && <p className="text-xs text-destructive">{errors.category}</p>}
+            </div>
+
+            {/* Notes - Last field */}
+            <div className="space-y-2">
+              <Label htmlFor="edit-notes" className="flex items-center gap-2 text-sm">
+                <StickyNote className="h-4 w-4 text-muted-foreground" />
+                Notes
+              </Label>
+              <Textarea
+                id="edit-notes"
+                value={formData.notes}
+                onChange={(e) => handleChange("notes", e.target.value)}
+                placeholder="Notes from the card or your own observations..."
+                rows={3}
+                className="bg-secondary/50 resize-none"
+              />
             </div>
           </div>
         </ScrollArea>
