@@ -224,8 +224,9 @@ export default function Analytics() {
               <TabsContent value="roles" className="mt-4">
                 <div className="glass-card p-4">
                   <RoleBreakdown 
-                    data={roleStats} 
-                    onTitleClick={handleTitleClick}
+                    data={roleStats}
+                    contacts={contacts}
+                    onContactClick={(contactId) => navigate(`/contacts/${contactId}`)}
                   />
                 </div>
               </TabsContent>

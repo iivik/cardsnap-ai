@@ -28,7 +28,7 @@ import {
   MapPin,
   StickyNote,
   Save,
-  X,
+  Globe,
 } from "lucide-react";
 import { toast } from "sonner";
 import type { CategoryType } from "@/components/ui/CategoryBadge";
@@ -83,6 +83,8 @@ export function EditContactModal({ open, onClose, contact, onSave }: EditContact
     email: "",
     address: "",
     notes: "",
+    city: "",
+    country: "",
   });
   const [category, setCategory] = useState<string>("random");
   const [meetingContext, setMeetingContext] = useState<string>("");
@@ -100,6 +102,8 @@ export function EditContactModal({ open, onClose, contact, onSave }: EditContact
         email: contact.email || "",
         address: contact.address || "",
         notes: contact.handwritten_notes || "",
+        city: contact.location_city || "",
+        country: contact.location_country || "",
       });
       setCategory(contact.category || "random");
       setMeetingContext(contact.meeting_context || "");
@@ -161,6 +165,8 @@ export function EditContactModal({ open, onClose, contact, onSave }: EditContact
           email: formData.email.trim(),
           address: formData.address.trim() || null,
           handwritten_notes: formData.notes.trim() || null,
+          location_city: formData.city.trim() || null,
+          location_country: formData.country.trim() || null,
           category: category as CategoryType,
           meeting_context: meetingContext as "office_my" | "office_client" | "office_partner" | "event" | "other",
           meeting_context_other: meetingContext === "other" ? meetingContextOther.trim() : null,
@@ -185,18 +191,11 @@ export function EditContactModal({ open, onClose, contact, onSave }: EditContact
     }
   };
 
-  const locationDisplay = [contact.location_city, contact.location_country].filter(Boolean).join(", ");
-
   return (
     <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
       <DialogContent className="max-w-lg h-[90vh] flex flex-col p-0 gap-0">
         <DialogHeader className="p-4 border-b border-border flex-shrink-0">
-          <div className="flex items-center justify-between">
-            <DialogTitle>Edit Contact</DialogTitle>
-            <Button variant="ghost" size="icon" onClick={onClose}>
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
+          <DialogTitle>Edit Contact</DialogTitle>
         </DialogHeader>
 
         <ScrollArea className="flex-1 overflow-y-auto">
@@ -291,25 +290,41 @@ export function EditContactModal({ open, onClose, contact, onSave }: EditContact
                 id="edit-address"
                 value={formData.address}
                 onChange={(e) => handleChange("address", e.target.value)}
-                placeholder="Address"
+                placeholder="Street address"
                 rows={2}
                 className="bg-secondary/50 resize-none"
               />
             </div>
 
+            {/* City */}
+            <div className="space-y-2">
+              <Label htmlFor="edit-city" className="flex items-center gap-2 text-sm">
+                <MapPin className="h-4 w-4 text-muted-foreground" />
+                City
+              </Label>
+              <Input
+                id="edit-city"
+                value={formData.city}
+                onChange={(e) => handleChange("city", e.target.value)}
+                placeholder="e.g., Dubai"
+                className="bg-secondary/50"
+              />
+            </div>
 
-            {/* Location (Display Only) */}
-            {locationDisplay && (
-              <div className="space-y-2">
-                <Label className="flex items-center gap-2 text-sm">
-                  <MapPin className="h-4 w-4 text-muted-foreground" />
-                  Location
-                </Label>
-                <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-secondary/30 text-sm text-muted-foreground">
-                  <span>{locationDisplay}</span>
-                </div>
-              </div>
-            )}
+            {/* Country */}
+            <div className="space-y-2">
+              <Label htmlFor="edit-country" className="flex items-center gap-2 text-sm">
+                <Globe className="h-4 w-4 text-muted-foreground" />
+                Country
+              </Label>
+              <Input
+                id="edit-country"
+                value={formData.country}
+                onChange={(e) => handleChange("country", e.target.value)}
+                placeholder="e.g., UAE"
+                className="bg-secondary/50"
+              />
+            </div>
 
             {/* Meeting Context */}
             <div className="space-y-2">
