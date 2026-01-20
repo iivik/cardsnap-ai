@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -13,10 +13,46 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Loader2, Save, Camera, User, Briefcase, Building2, Phone, Mail, MapPin, StickyNote } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  Loader2,
+  CheckCircle2,
+  Camera,
+  User,
+  Briefcase,
+  Building2,
+  Phone,
+  Mail,
+  MapPin,
+  StickyNote,
+  AlertTriangle,
+} from "lucide-react";
 import { toast } from "sonner";
-const CATEGORY_OPTIONS = ["client", "prospect_client", "prospect_partner", "partner", "influencer", "random"] as const;
-const MEETING_CONTEXT_OPTIONS = ["office_my", "office_client", "office_partner", "event", "other"] as const;
+
+const CATEGORY_OPTIONS = [
+  { value: "client", label: "Client" },
+  { value: "prospect_client", label: "Prospect - Client" },
+  { value: "prospect_partner", label: "Prospect - Partner" },
+  { value: "partner", label: "Partner" },
+  { value: "influencer", label: "Influencer" },
+  { value: "random", label: "Random/Other" },
+] as const;
+
+const MEETING_CONTEXT_OPTIONS = [
+  { value: "office_my", label: "Office Meeting - My Office" },
+  { value: "office_client", label: "Office Meeting - Client Office" },
+  { value: "office_partner", label: "Office Meeting - Partner Office" },
+  { value: "event", label: "Event/Conference" },
+  { value: "other", label: "Other" },
+] as const;
 
 interface ExtractedData {
   name: string;
@@ -33,6 +69,13 @@ interface LocationData {
   longitude: number | null;
   city: string;
   country: string;
+}
+
+interface DuplicateContact {
+  id: string;
+  name: string;
+  company: string;
+  email: string;
 }
 
 export default function Review() {
@@ -55,7 +98,8 @@ export default function Review() {
     handwritten_notes: "",
   });
   const [category, setCategory] = useState<string>("random");
-  const [meetingContext, setMeetingContext] = useState<string>("other");
+  const [meetingContext, setMeetingContext] = useState<string>("");
+  const [meetingContextOther, setMeetingContextOther] = useState<string>("");
   const [isSaving, setIsSaving] = useState(false);
   const [locationData, setLocationData] = useState<LocationData>({
     latitude: null,
@@ -64,6 +108,10 @@ export default function Review() {
     country: "",
   });
   const [isGettingLocation, setIsGettingLocation] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [duplicateContact, setDuplicateContact] = useState<DuplicateContact | null>(null);
+  const [showDuplicateDialog, setShowDuplicateDialog] = useState(false);
+  const [pendingNavigation, setPendingNavigation] = useState<"contacts" | "scan" | null>(null);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -105,7 +153,7 @@ export default function Review() {
         longitude,
       }));
 
-      // Reverse geocode to get location name (using a free API)
+      // Reverse geocode to get location name
       try {
         const response = await fetch(
           `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`
@@ -130,13 +178,78 @@ export default function Review() {
 
   const handleChange = (field: keyof ExtractedData, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
+    // Clear error when user types
+    if (errors[field]) {
+      setErrors((prev) => ({ ...prev, [field]: "" }));
+    }
   };
 
-  const handleSave = async () => {
-    if (!user || !formData.name.trim()) {
-      toast.error("Name is required");
-      return;
+  const validateForm = (): boolean => {
+    const newErrors: Record<string, string> = {};
+
+    if (!formData.name.trim()) {
+      newErrors.name = "Name is required";
     }
+    if (!formData.company.trim()) {
+      newErrors.company = "Company is required";
+    }
+    if (!formData.email.trim()) {
+      newErrors.email = "Email is required";
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
+      newErrors.email = "Please enter a valid email";
+    }
+    if (!meetingContext) {
+      newErrors.meetingContext = "Meeting context is required";
+    }
+    if (meetingContext === "other" && !meetingContextOther.trim()) {
+      newErrors.meetingContextOther = "Please specify the meeting context";
+    }
+    if (!category) {
+      newErrors.category = "Category is required";
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const checkForDuplicates = async (): Promise<DuplicateContact | null> => {
+    if (!user) return null;
+
+    try {
+      const { data } = await supabase
+        .from("contacts")
+        .select("id, name, company, email")
+        .eq("user_id", user.id)
+        .ilike("name", formData.name.trim())
+        .ilike("company", formData.company.trim())
+        .limit(1)
+        .maybeSingle();
+
+      return data;
+    } catch (err) {
+      console.error("Error checking duplicates:", err);
+      return null;
+    }
+  };
+
+  const deleteCardImage = async () => {
+    if (!imagePath) return;
+
+    try {
+      const { error } = await supabase.storage
+        .from("card-images")
+        .remove([imagePath]);
+      
+      if (error) {
+        console.error("Error deleting card image:", error);
+      }
+    } catch (err) {
+      console.error("Error deleting card image:", err);
+    }
+  };
+
+  const saveContact = async (navigateTo: "contacts" | "scan") => {
+    if (!user) return;
 
     setIsSaving(true);
     try {
@@ -144,13 +257,14 @@ export default function Review() {
         user_id: user.id,
         name: formData.name.trim(),
         title: formData.title.trim() || null,
-        company: formData.company.trim() || "Unknown",
+        company: formData.company.trim(),
         phone: formData.phone.trim() || null,
-        email: formData.email.trim() || "unknown@example.com",
+        email: formData.email.trim(),
         address: formData.address.trim() || null,
         handwritten_notes: formData.handwritten_notes.trim() || null,
         category: category as "client" | "prospect_client" | "prospect_partner" | "partner" | "influencer" | "random",
         meeting_context: meetingContext as "office_my" | "office_client" | "office_partner" | "event" | "other",
+        meeting_context_other: meetingContext === "other" ? meetingContextOther.trim() : null,
         gps_latitude: locationData.latitude,
         gps_longitude: locationData.longitude,
         location_city: locationData.city || null,
@@ -160,8 +274,16 @@ export default function Review() {
 
       if (error) throw error;
 
+      // Delete temporary card image from storage
+      await deleteCardImage();
+
       toast.success("Contact saved successfully!");
-      navigate(`/contacts/${data.id}`);
+      
+      if (navigateTo === "contacts") {
+        navigate("/contacts");
+      } else {
+        navigate("/scan");
+      }
     } catch (err) {
       console.error("Save error:", err);
       toast.error("Failed to save contact. Please try again.");
@@ -170,8 +292,77 @@ export default function Review() {
     }
   };
 
-  const handleRetake = () => {
-    navigate("/scan");
+  const handleSave = async (navigateTo: "contacts" | "scan") => {
+    if (!validateForm()) {
+      toast.error("Please fill in all required fields");
+      return;
+    }
+
+    // Check for duplicates
+    const duplicate = await checkForDuplicates();
+    if (duplicate) {
+      setDuplicateContact(duplicate);
+      setPendingNavigation(navigateTo);
+      setShowDuplicateDialog(true);
+      return;
+    }
+
+    await saveContact(navigateTo);
+  };
+
+  const handleMergeDuplicate = async () => {
+    if (!user || !duplicateContact) return;
+
+    setIsSaving(true);
+    try {
+      // Update existing contact with new data
+      const { error } = await supabase
+        .from("contacts")
+        .update({
+          name: formData.name.trim(),
+          title: formData.title.trim() || null,
+          company: formData.company.trim(),
+          phone: formData.phone.trim() || null,
+          email: formData.email.trim(),
+          address: formData.address.trim() || null,
+          handwritten_notes: formData.handwritten_notes.trim() || null,
+          category: category as "client" | "prospect_client" | "prospect_partner" | "partner" | "influencer" | "random",
+          meeting_context: meetingContext as "office_my" | "office_client" | "office_partner" | "event" | "other",
+          meeting_context_other: meetingContext === "other" ? meetingContextOther.trim() : null,
+          gps_latitude: locationData.latitude,
+          gps_longitude: locationData.longitude,
+          location_city: locationData.city || null,
+          location_country: locationData.country || null,
+          card_image_url: imageUrl || null,
+        })
+        .eq("id", duplicateContact.id);
+
+      if (error) throw error;
+
+      // Delete temporary card image
+      await deleteCardImage();
+
+      toast.success("Contact updated successfully!");
+      setShowDuplicateDialog(false);
+      
+      if (pendingNavigation === "contacts") {
+        navigate("/contacts");
+      } else {
+        navigate("/scan");
+      }
+    } catch (err) {
+      console.error("Merge error:", err);
+      toast.error("Failed to update contact. Please try again.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleCreateNew = async () => {
+    setShowDuplicateDialog(false);
+    if (pendingNavigation) {
+      await saveContact(pendingNavigation);
+    }
   };
 
   if (authLoading) {
@@ -184,49 +375,51 @@ export default function Review() {
 
   if (!user || !imageUrl) return null;
 
+  const locationDisplay = [locationData.city, locationData.country].filter(Boolean).join(", ");
+
   return (
-    <div className="min-h-screen bg-background">
-      <div className="max-w-2xl mx-auto p-4 pb-24">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <h1 className="text-2xl font-bold text-foreground">Review Contact</h1>
-          <Button variant="outline" onClick={handleRetake} className="gap-2">
-            <Camera className="h-4 w-4" />
-            Retake
-          </Button>
-        </div>
+    <div className="fixed inset-0 bg-background flex flex-col">
+      {/* Card Image Preview - Top 30% */}
+      <div className="h-[30vh] relative flex-shrink-0 bg-black/50">
+        <img
+          src={imageUrl}
+          alt="Business card"
+          className="w-full h-full object-contain"
+        />
+        <div className="absolute inset-0 bg-gradient-to-b from-transparent to-background/80 pointer-events-none" />
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => navigate("/scan")}
+          className="absolute top-4 right-4 gap-2 bg-black/50 backdrop-blur-sm border-white/20 text-white hover:bg-black/70"
+        >
+          <Camera className="h-4 w-4" />
+          Retake
+        </Button>
+      </div>
 
-        {/* Card image preview */}
-        <div className="mb-6">
-          <div className="relative w-full aspect-[1.75] rounded-xl overflow-hidden shadow-lg">
-            <img
-              src={imageUrl}
-              alt="Business card"
-              className="w-full h-full object-cover"
-            />
-          </div>
-        </div>
-
-        {/* Form */}
-        <div className="glass-card p-6 space-y-5">
+      {/* Scrollable Form - Middle */}
+      <ScrollArea className="flex-1 overflow-y-auto">
+        <div className="p-4 pb-32 space-y-4">
           {/* Name */}
           <div className="space-y-2">
-            <Label htmlFor="name" className="flex items-center gap-2">
+            <Label htmlFor="name" className="flex items-center gap-2 text-sm">
               <User className="h-4 w-4 text-muted-foreground" />
-              Name *
+              Name <span className="text-destructive">*</span>
             </Label>
             <Input
               id="name"
               value={formData.name}
               onChange={(e) => handleChange("name", e.target.value)}
               placeholder="Full name"
-              className="bg-background/50"
+              className={`bg-secondary/50 ${errors.name ? "border-destructive" : ""}`}
             />
+            {errors.name && <p className="text-xs text-destructive">{errors.name}</p>}
           </div>
 
           {/* Title */}
           <div className="space-y-2">
-            <Label htmlFor="title" className="flex items-center gap-2">
+            <Label htmlFor="title" className="flex items-center gap-2 text-sm">
               <Briefcase className="h-4 w-4 text-muted-foreground" />
               Title
             </Label>
@@ -235,28 +428,29 @@ export default function Review() {
               value={formData.title}
               onChange={(e) => handleChange("title", e.target.value)}
               placeholder="Job title"
-              className="bg-background/50"
+              className="bg-secondary/50"
             />
           </div>
 
           {/* Company */}
           <div className="space-y-2">
-            <Label htmlFor="company" className="flex items-center gap-2">
+            <Label htmlFor="company" className="flex items-center gap-2 text-sm">
               <Building2 className="h-4 w-4 text-muted-foreground" />
-              Company
+              Company <span className="text-destructive">*</span>
             </Label>
             <Input
               id="company"
               value={formData.company}
               onChange={(e) => handleChange("company", e.target.value)}
               placeholder="Company name"
-              className="bg-background/50"
+              className={`bg-secondary/50 ${errors.company ? "border-destructive" : ""}`}
             />
+            {errors.company && <p className="text-xs text-destructive">{errors.company}</p>}
           </div>
 
           {/* Phone */}
           <div className="space-y-2">
-            <Label htmlFor="phone" className="flex items-center gap-2">
+            <Label htmlFor="phone" className="flex items-center gap-2 text-sm">
               <Phone className="h-4 w-4 text-muted-foreground" />
               Phone
             </Label>
@@ -266,15 +460,15 @@ export default function Review() {
               value={formData.phone}
               onChange={(e) => handleChange("phone", e.target.value)}
               placeholder="Phone number"
-              className="bg-background/50"
+              className="bg-secondary/50"
             />
           </div>
 
           {/* Email */}
           <div className="space-y-2">
-            <Label htmlFor="email" className="flex items-center gap-2">
+            <Label htmlFor="email" className="flex items-center gap-2 text-sm">
               <Mail className="h-4 w-4 text-muted-foreground" />
-              Email
+              Email <span className="text-destructive">*</span>
             </Label>
             <Input
               id="email"
@@ -282,110 +476,202 @@ export default function Review() {
               value={formData.email}
               onChange={(e) => handleChange("email", e.target.value)}
               placeholder="Email address"
-              className="bg-background/50"
+              className={`bg-secondary/50 ${errors.email ? "border-destructive" : ""}`}
             />
+            {errors.email && <p className="text-xs text-destructive">{errors.email}</p>}
           </div>
 
           {/* Address */}
           <div className="space-y-2">
-            <Label htmlFor="address" className="flex items-center gap-2">
+            <Label htmlFor="address" className="flex items-center gap-2 text-sm">
               <MapPin className="h-4 w-4 text-muted-foreground" />
               Address
             </Label>
-            <Input
+            <Textarea
               id="address"
               value={formData.address}
               onChange={(e) => handleChange("address", e.target.value)}
               placeholder="Address"
-              className="bg-background/50"
+              rows={2}
+              className="bg-secondary/50 resize-none"
             />
           </div>
 
-          {/* Category */}
+          {/* Handwritten Notes */}
           <div className="space-y-2">
-            <Label>Category</Label>
-            <Select value={category} onValueChange={setCategory}>
-              <SelectTrigger className="bg-background/50">
-                <SelectValue placeholder="Select category" />
-              </SelectTrigger>
-              <SelectContent>
-                {CATEGORY_OPTIONS.map((cat) => (
-                  <SelectItem key={cat} value={cat}>
-                    {cat.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase())}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Meeting Context */}
-          <div className="space-y-2">
-            <Label>Where did you meet?</Label>
-            <Select value={meetingContext} onValueChange={setMeetingContext}>
-              <SelectTrigger className="bg-background/50">
-                <SelectValue placeholder="Select context" />
-              </SelectTrigger>
-              <SelectContent>
-                {MEETING_CONTEXT_OPTIONS.map((ctx) => (
-                  <SelectItem key={ctx} value={ctx}>
-                    {ctx === "office_my"
-                      ? "My Office"
-                      : ctx === "office_client"
-                      ? "Client's Office"
-                      : ctx === "office_partner"
-                      ? "Partner's Office"
-                      : ctx.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase())}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Location */}
-          {(locationData.city || locationData.country) && (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <MapPin className="h-4 w-4" />
-              <span>{[locationData.city, locationData.country].filter(Boolean).join(", ")}</span>
-              {isGettingLocation && <Loader2 className="h-3 w-3 animate-spin" />}
-            </div>
-          )}
-
-          {/* Notes */}
-          <div className="space-y-2">
-            <Label htmlFor="notes" className="flex items-center gap-2">
+            <Label htmlFor="notes" className="flex items-center gap-2 text-sm">
               <StickyNote className="h-4 w-4 text-muted-foreground" />
-              Notes
+              Handwritten Notes
             </Label>
             <Textarea
               id="notes"
               value={formData.handwritten_notes}
               onChange={(e) => handleChange("handwritten_notes", e.target.value)}
-              placeholder="Any additional notes..."
-              rows={3}
-              className="bg-background/50 resize-none"
+              placeholder="Any notes from the card..."
+              rows={2}
+              className="bg-secondary/50 resize-none"
             />
           </div>
-        </div>
 
-        {/* Save button */}
-        <div className="fixed bottom-0 left-0 right-0 p-4 bg-background/80 backdrop-blur-lg border-t border-border">
-          <div className="max-w-2xl mx-auto">
-            <Button
-              onClick={handleSave}
-              disabled={isSaving || !formData.name.trim()}
-              className="w-full gap-2"
-              size="lg"
-            >
-              {isSaving ? (
-                <Loader2 className="h-5 w-5 animate-spin" />
+          {/* Location (Display Only) */}
+          <div className="space-y-2">
+            <Label className="flex items-center gap-2 text-sm">
+              <MapPin className="h-4 w-4 text-muted-foreground" />
+              Location
+            </Label>
+            <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-secondary/30 text-sm text-muted-foreground">
+              {isGettingLocation ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span>Getting location...</span>
+                </>
+              ) : locationDisplay ? (
+                <span>{locationDisplay}</span>
               ) : (
-                <Save className="h-5 w-5" />
+                <span className="italic">Location not available</span>
               )}
-              Save Contact
-            </Button>
+            </div>
+          </div>
+
+          {/* Meeting Context */}
+          <div className="space-y-2">
+            <Label className="text-sm">
+              Meeting Context <span className="text-destructive">*</span>
+            </Label>
+            <Select value={meetingContext} onValueChange={(v) => {
+              setMeetingContext(v);
+              if (errors.meetingContext) setErrors((prev) => ({ ...prev, meetingContext: "" }));
+            }}>
+              <SelectTrigger className={`bg-secondary/50 ${errors.meetingContext ? "border-destructive" : ""}`}>
+                <SelectValue placeholder="Where did you meet?" />
+              </SelectTrigger>
+              <SelectContent className="bg-card border-border">
+                {MEETING_CONTEXT_OPTIONS.map((ctx) => (
+                  <SelectItem key={ctx.value} value={ctx.value}>
+                    {ctx.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {errors.meetingContext && <p className="text-xs text-destructive">{errors.meetingContext}</p>}
+          </div>
+
+          {/* Meeting Context Other */}
+          {meetingContext === "other" && (
+            <div className="space-y-2">
+              <Label htmlFor="meetingContextOther" className="text-sm">
+                Please specify <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                id="meetingContextOther"
+                value={meetingContextOther}
+                onChange={(e) => {
+                  setMeetingContextOther(e.target.value);
+                  if (errors.meetingContextOther) setErrors((prev) => ({ ...prev, meetingContextOther: "" }));
+                }}
+                placeholder="Describe where you met..."
+                className={`bg-secondary/50 ${errors.meetingContextOther ? "border-destructive" : ""}`}
+              />
+              {errors.meetingContextOther && <p className="text-xs text-destructive">{errors.meetingContextOther}</p>}
+            </div>
+          )}
+
+          {/* Category */}
+          <div className="space-y-2">
+            <Label className="text-sm">
+              Category <span className="text-destructive">*</span>
+            </Label>
+            <Select value={category} onValueChange={(v) => {
+              setCategory(v);
+              if (errors.category) setErrors((prev) => ({ ...prev, category: "" }));
+            }}>
+              <SelectTrigger className={`bg-secondary/50 ${errors.category ? "border-destructive" : ""}`}>
+                <SelectValue placeholder="Select category" />
+              </SelectTrigger>
+              <SelectContent className="bg-card border-border">
+                {CATEGORY_OPTIONS.map((cat) => (
+                  <SelectItem key={cat.value} value={cat.value}>
+                    {cat.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {errors.category && <p className="text-xs text-destructive">{errors.category}</p>}
           </div>
         </div>
+      </ScrollArea>
+
+      {/* Bottom Buttons - Fixed */}
+      <div className="fixed bottom-0 left-0 right-0 p-4 bg-background/90 backdrop-blur-lg border-t border-border">
+        <div className="flex gap-3">
+          <Button
+            onClick={() => handleSave("scan")}
+            disabled={isSaving}
+            variant="outline"
+            className="flex-1 gap-2 bg-primary/10 border-primary/30 hover:bg-primary/20"
+            size="lg"
+          >
+            {isSaving ? (
+              <Loader2 className="h-5 w-5 animate-spin" />
+            ) : (
+              <Camera className="h-5 w-5" />
+            )}
+            Continue Scanning
+          </Button>
+          <Button
+            onClick={() => handleSave("contacts")}
+            disabled={isSaving}
+            className="flex-1 gap-2"
+            size="lg"
+            style={{ backgroundColor: "hsl(var(--success))", color: "hsl(var(--success-foreground))" }}
+          >
+            {isSaving ? (
+              <Loader2 className="h-5 w-5 animate-spin" />
+            ) : (
+              <CheckCircle2 className="h-5 w-5" />
+            )}
+            Process & Done
+          </Button>
+        </div>
       </div>
+
+      {/* Duplicate Detection Dialog */}
+      <Dialog open={showDuplicateDialog} onOpenChange={setShowDuplicateDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5" style={{ color: "hsl(var(--warning))" }} />
+              Duplicate Contact Found
+            </DialogTitle>
+            <DialogDescription>
+              A contact with the same name and company already exists:
+              <div className="mt-3 p-3 rounded-lg bg-secondary/50 text-foreground">
+                <p className="font-medium">{duplicateContact?.name}</p>
+                <p className="text-sm text-muted-foreground">{duplicateContact?.company}</p>
+                <p className="text-sm text-muted-foreground">{duplicateContact?.email}</p>
+              </div>
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex-col sm:flex-row gap-2">
+            <Button
+              variant="outline"
+              onClick={handleCreateNew}
+              disabled={isSaving}
+              className="flex-1"
+            >
+              Create New
+            </Button>
+            <Button
+              onClick={handleMergeDuplicate}
+              disabled={isSaving}
+              className="flex-1"
+              style={{ backgroundColor: "hsl(var(--warning))", color: "hsl(var(--warning-foreground))" }}
+            >
+              {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Update Existing"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
