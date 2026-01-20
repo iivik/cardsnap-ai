@@ -37,6 +37,7 @@ import {
   Home,
 } from "lucide-react";
 import { toast } from "sonner";
+import { LocationSelector } from "@/components/review/LocationSelector";
 
 const CATEGORY_OPTIONS = [
   { value: "client", label: "Client" },
@@ -64,6 +65,8 @@ interface ExtractedData {
   address: string;
   notes: string;
   handwritten_notes?: string; // Legacy support
+  inferred_country?: string;
+  inferred_city?: string;
 }
 
 interface LocationData {
@@ -91,6 +94,10 @@ export default function Review() {
     locationData?: LocationData;
   }) || {};
 
+  // Inferred location from AI
+  const inferredCity = extractedData?.inferred_city || "";
+  const inferredCountry = extractedData?.inferred_country || "";
+
   const [formData, setFormData] = useState<ExtractedData>({
     name: "",
     title: "",
@@ -115,6 +122,45 @@ export default function Review() {
   const [duplicateContact, setDuplicateContact] = useState<DuplicateContact | null>(null);
   const [showDuplicateDialog, setShowDuplicateDialog] = useState(false);
   const [pendingNavigation, setPendingNavigation] = useState<"contacts" | "scan" | null>(null);
+  const [existingLocations, setExistingLocations] = useState<Array<{city: string; country: string; count: number}>>([]);
+
+  // Fetch existing locations from user's contacts
+  useEffect(() => {
+    const fetchExistingLocations = async () => {
+      if (!user) return;
+      
+      try {
+        const { data } = await supabase
+          .from("contacts")
+          .select("location_city, location_country")
+          .eq("user_id", user.id)
+          .not("location_country", "is", null);
+        
+        if (data) {
+          const locationMap = new Map<string, number>();
+          data.forEach(c => {
+            const key = `${c.location_city || ''}|${c.location_country}`;
+            locationMap.set(key, (locationMap.get(key) || 0) + 1);
+          });
+          
+          const locations: Array<{city: string; country: string; count: number}> = [];
+          locationMap.forEach((count, key) => {
+            const [city, country] = key.split('|');
+            if (country) {
+              locations.push({ city, country, count });
+            }
+          });
+          
+          locations.sort((a, b) => b.count - a.count);
+          setExistingLocations(locations);
+        }
+      } catch (err) {
+        console.error("Error fetching locations:", err);
+      }
+    };
+    
+    fetchExistingLocations();
+  }, [user]);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -136,14 +182,21 @@ export default function Review() {
       setFormData(normalizedData);
     }
 
-    // Use passed location or get fresh location
-    if (passedLocation && (passedLocation.city || passedLocation.country)) {
+    // Use passed location, or inferred location, or get fresh location
+    if (inferredCity || inferredCountry) {
+      setLocationData({
+        latitude: passedLocation?.latitude || null,
+        longitude: passedLocation?.longitude || null,
+        city: inferredCity,
+        country: inferredCountry,
+      });
+    } else if (passedLocation && (passedLocation.city || passedLocation.country)) {
       setLocationData(passedLocation);
     } else {
       getLocation();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, authLoading, imageUrl, extractedData, passedLocation]);
+  }, [user, authLoading, imageUrl, extractedData, passedLocation, inferredCity, inferredCountry]);
 
   const getLocation = async () => {
     if (!navigator.geolocation) return;

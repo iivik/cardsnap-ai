@@ -119,19 +119,19 @@ export function useCamera(options: UseCameraOptions = {}) {
       }
 
       const avgDiff = diff / (sampleSize / 64);
-      const isStable = avgDiff < 15; // Threshold for stability
-      const hasContent = edgeSum > 10000; // Threshold for detecting content
+      const isStable = avgDiff < 25; // Threshold for stability (lowered from 15 for more forgiving detection)
+      const hasContent = edgeSum > 5000; // Threshold for detecting content (lowered from 10000)
 
       if (isStable && hasContent) {
         stabilityCountRef.current++;
         
-        // Card detected after 3 stable frames (~900ms)
-        if (stabilityCountRef.current >= 3 && !isCardDetected) {
+        // Card detected after 2 stable frames (~600ms)
+        if (stabilityCountRef.current >= 2 && !isCardDetected) {
           setIsCardDetected(true);
         }
         
-        // Start countdown after 5 stable frames (~1.5s)
-        if (stabilityCountRef.current === 5 && !isCountingDown && onAutoCapture) {
+        // Start countdown after 4 stable frames (~1.2s)
+        if (stabilityCountRef.current === 4 && !isCountingDown && onAutoCapture) {
           setIsCountingDown(true);
           setCountdown(3);
           

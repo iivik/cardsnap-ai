@@ -14,6 +14,8 @@ interface ExtractedData {
   email: string;
   address: string;
   handwritten_notes: string;
+  inferred_country?: string;
+  inferred_city?: string;
 }
 
 type StepStatus = "pending" | "active" | "complete" | "error";
@@ -86,7 +88,15 @@ export default function Processing() {
         email: "",
         address: "",
         handwritten_notes: "",
+        inferred_country: "",
+        inferred_city: "",
       };
+
+      // Also include inferred location from AI
+      if (data?.data) {
+        extractedData.inferred_country = data.data.inferred_country || "";
+        extractedData.inferred_city = data.data.inferred_city || "";
+      }
 
       // Navigate to review page with extracted data
       navigate("/review", {

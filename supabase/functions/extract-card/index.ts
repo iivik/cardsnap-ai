@@ -50,8 +50,16 @@ serve(async (req) => {
 
 PHONE FIELD INSTRUCTIONS: If multiple phone numbers are present, extract ONLY the mobile/cell number. Look for numbers marked as "M", "Mobile", "Cell", "Mob", or similar indicators. If no mobile number is clearly identified, use the most likely personal/direct number (not office landlines or fax numbers).
 
-Return a JSON object with these fields: name, title, company, phone (mobile only), email, address, notes.
+LOCATION INFERENCE: Analyze the card to determine the contact's likely location:
+- Check email domain (.jp = Japan, .ae = UAE, .sg = Singapore, .in = India, .uk = UK, .au = Australia, etc.)
+- Check phone country code (+971 = UAE, +65 = Singapore, +91 = India, +81 = Japan, +44 = UK, etc.)
+- Check address if present for city/country information
+- Check company name or regional office mentioned
+
+Return a JSON object with these fields: name, title, company, phone (mobile only), email, address, notes, inferred_country, inferred_city.
 The "notes" field should contain any handwritten notes visible on the card.
+The "inferred_country" field should contain the country name (e.g., "UAE", "India", "Singapore", "Japan").
+The "inferred_city" field should contain the city name if detectable (e.g., "Dubai", "Mumbai", "Tokyo").
 Return empty string if a field is not found. Only return the JSON object, no markdown formatting.`,
               },
               {
