@@ -1,12 +1,35 @@
-import { useEffect } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
-import { AppLayout } from "@/components/layout/AppLayout";
-import { Camera, Zap, Loader2 } from "lucide-react";
+import { useCamera } from "@/hooks/useCamera";
+import { supabase } from "@/integrations/supabase/client";
+import { CameraOverlay } from "@/components/camera/CameraOverlay";
+import { CameraControls } from "@/components/camera/CameraControls";
+import { CaptureButton } from "@/components/camera/CaptureButton";
+import { Loader2, Camera, AlertCircle } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 
 export default function Scan() {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
+  const [isCapturing, setIsCapturing] = useState(false);
+  const [cameraStarted, setCameraStarted] = useState(false);
+
+  const {
+    videoRef,
+    stream,
+    error: cameraError,
+    isLoading: cameraLoading,
+    hasMultipleCameras,
+    torchSupported,
+    torchOn,
+    startCamera,
+    stopCamera,
+    flipCamera,
+    toggleTorch,
+    captureImage,
+  } = useCamera({ facingMode: "environment" });
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -14,9 +37,80 @@ export default function Scan() {
     }
   }, [user, authLoading, navigate]);
 
+  // Start camera when component mounts
+  useEffect(() => {
+    if (user && !cameraStarted) {
+      startCamera();
+      setCameraStarted(true);
+    }
+  }, [user, cameraStarted, startCamera]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      stopCamera();
+    };
+  }, [stopCamera]);
+
+  const handleCancel = useCallback(() => {
+    stopCamera();
+    navigate(-1);
+  }, [stopCamera, navigate]);
+
+  const handleCapture = useCallback(async () => {
+    if (isCapturing || !user) return;
+
+    setIsCapturing(true);
+
+    try {
+      // Capture image from video
+      const imageData = captureImage();
+      if (!imageData) {
+        throw new Error("Failed to capture image");
+      }
+
+      // Convert base64 to blob
+      const response = await fetch(imageData);
+      const blob = await response.blob();
+
+      // Generate unique filename
+      const filename = `${user.id}/${Date.now()}-card.jpg`;
+
+      // Upload to Supabase Storage
+      const { data, error } = await supabase.storage
+        .from("card-images")
+        .upload(filename, blob, {
+          contentType: "image/jpeg",
+          upsert: false,
+        });
+
+      if (error) {
+        throw error;
+      }
+
+      // Get public URL
+      const { data: urlData } = supabase.storage
+        .from("card-images")
+        .getPublicUrl(data.path);
+
+      // Stop camera before navigating
+      stopCamera();
+
+      // Navigate to processing page with image URL
+      navigate("/processing", {
+        state: { imageUrl: urlData.publicUrl, imagePath: data.path },
+      });
+    } catch (err) {
+      console.error("Capture error:", err);
+      toast.error("Failed to capture image. Please try again.");
+    } finally {
+      setIsCapturing(false);
+    }
+  }, [isCapturing, user, captureImage, stopCamera, navigate]);
+
   if (authLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
@@ -24,49 +118,84 @@ export default function Scan() {
 
   if (!user) return null;
 
-  return (
-    <AppLayout>
-      <div className="min-h-screen flex flex-col items-center justify-center p-6">
-        <div className="text-center space-y-6 animate-fade-in">
-          <div className="relative inline-block">
-            <div className="p-8 rounded-3xl bg-gradient-to-br from-primary/20 to-purple-500/20 backdrop-blur-xl border border-white/10">
-              <Camera className="h-20 w-20 text-primary" />
-            </div>
-            <div className="absolute -top-3 -right-3 p-3 rounded-full bg-gradient-to-br from-primary to-purple-500 shadow-glow animate-pulse">
-              <Zap className="h-5 w-5 text-white" />
-            </div>
+  // Camera error state
+  if (cameraError) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-background">
+        <div className="text-center space-y-6 max-w-md">
+          <div className="p-6 rounded-full bg-destructive/10 inline-block">
+            <AlertCircle className="h-12 w-12 text-destructive" />
           </div>
-
           <div>
-            <h2 className="text-2xl font-bold text-foreground mb-2">Camera Coming Soon</h2>
-            <p className="text-muted-foreground max-w-xs mx-auto">
-              The AI-powered card scanner will be available in the next update
-            </p>
+            <h2 className="text-xl font-bold text-foreground mb-2">Camera Access Required</h2>
+            <p className="text-muted-foreground">{cameraError}</p>
           </div>
-
-          <div className="glass-card p-6 max-w-md mx-auto">
-            <h3 className="font-semibold text-foreground mb-3">What to expect:</h3>
-            <ul className="text-sm text-muted-foreground space-y-2 text-left">
-              <li className="flex items-center gap-2">
-                <div className="w-1.5 h-1.5 rounded-full bg-primary" />
-                Point your camera at any business card
-              </li>
-              <li className="flex items-center gap-2">
-                <div className="w-1.5 h-1.5 rounded-full bg-primary" />
-                AI extracts name, company, email & phone
-              </li>
-              <li className="flex items-center gap-2">
-                <div className="w-1.5 h-1.5 rounded-full bg-primary" />
-                Auto-saves location and meeting context
-              </li>
-              <li className="flex items-center gap-2">
-                <div className="w-1.5 h-1.5 rounded-full bg-primary" />
-                Batch scan multiple cards at once
-              </li>
-            </ul>
+          <div className="flex gap-3 justify-center">
+            <Button variant="outline" onClick={() => navigate(-1)}>
+              Go Back
+            </Button>
+            <Button onClick={startCamera}>
+              Try Again
+            </Button>
           </div>
         </div>
       </div>
-    </AppLayout>
+    );
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black">
+      {/* Loading state */}
+      {cameraLoading && (
+        <div className="absolute inset-0 flex items-center justify-center bg-black z-20">
+          <div className="text-center space-y-4">
+            <Loader2 className="h-10 w-10 animate-spin text-primary mx-auto" />
+            <p className="text-white/80">Starting camera...</p>
+          </div>
+        </div>
+      )}
+
+      {/* Video preview */}
+      <video
+        ref={videoRef}
+        autoPlay
+        playsInline
+        muted
+        className="absolute inset-0 w-full h-full object-cover"
+      />
+
+      {/* Camera controls */}
+      {stream && (
+        <>
+          <CameraControls
+            onCancel={handleCancel}
+            onFlip={flipCamera}
+            onToggleTorch={toggleTorch}
+            torchOn={torchOn}
+            torchSupported={torchSupported}
+            hasMultipleCameras={hasMultipleCameras}
+            isCapturing={isCapturing}
+          />
+
+          <CameraOverlay />
+
+          <CaptureButton
+            onCapture={handleCapture}
+            isCapturing={isCapturing}
+            disabled={!stream}
+          />
+        </>
+      )}
+
+      {/* Not started state */}
+      {!stream && !cameraLoading && !cameraError && (
+        <div className="absolute inset-0 flex items-center justify-center">
+          <Button onClick={startCamera} size="lg" className="gap-2">
+            <Camera className="h-5 w-5" />
+            Start Camera
+          </Button>
+        </div>
+      )}
+    </div>
   );
 }
