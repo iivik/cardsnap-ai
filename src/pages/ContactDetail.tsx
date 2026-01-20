@@ -4,6 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { CategoryBadge, type CategoryType } from "@/components/ui/CategoryBadge";
 import { GlassCard } from "@/components/ui/GlassCard";
+import { EditContactModal } from "@/components/contacts/EditContactModal";
 import { useToast } from "@/hooks/use-toast";
 import {
   ArrowLeft,
@@ -31,6 +32,8 @@ interface Contact {
   location_city: string | null;
   location_country: string | null;
   category: CategoryType;
+  meeting_context: string | null;
+  meeting_context_other: string | null;
   created_at: string;
 }
 
@@ -42,6 +45,7 @@ export default function ContactDetail() {
   const [contact, setContact] = useState<Contact | null>(null);
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -68,6 +72,8 @@ export default function ContactDetail() {
       setContact({
         ...data,
         category: (data.category as CategoryType) || 'random',
+        meeting_context: data.meeting_context || null,
+        meeting_context_other: data.meeting_context_other || null,
       });
     } catch (error) {
       console.error("Error fetching contact:", error);
@@ -138,7 +144,10 @@ export default function ContactDetail() {
           <ArrowLeft className="h-5 w-5" />
         </button>
         <div className="flex gap-2">
-          <button className="p-2.5 rounded-xl glass-button">
+          <button 
+            onClick={() => setIsEditModalOpen(true)}
+            className="p-2.5 rounded-xl glass-button"
+          >
             <Edit2 className="h-5 w-5" />
           </button>
           <button
@@ -265,6 +274,17 @@ export default function ContactDetail() {
           </div>
         </GlassCard>
       </div>
+
+      {/* Edit Contact Modal */}
+      <EditContactModal
+        open={isEditModalOpen}
+        onClose={() => setIsEditModalOpen(false)}
+        contact={contact}
+        onSave={(updatedContact) => {
+          setContact(updatedContact);
+          setIsEditModalOpen(false);
+        }}
+      />
     </div>
   );
 }
