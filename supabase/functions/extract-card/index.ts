@@ -50,11 +50,11 @@ serve(async (req) => {
 
 PHONE FIELD INSTRUCTIONS: If multiple phone numbers are present, extract ONLY the mobile/cell number. Look for numbers marked as "M", "Mobile", "Cell", "Mob", or similar indicators. If no mobile number is clearly identified, use the most likely personal/direct number (not office landlines or fax numbers).
 
-LOCATION INFERENCE: Analyze the card to determine the contact's likely location:
-- Check email domain (.jp = Japan, .ae = UAE, .sg = Singapore, .in = India, .uk = UK, .au = Australia, etc.)
-- Check phone country code (+971 = UAE, +65 = Singapore, +91 = India, +81 = Japan, +44 = UK, etc.)
-- Check address if present for city/country information
-- Check company name or regional office mentioned
+LOCATION INFERENCE (PRIORITY ORDER - use the FIRST successful method):
+1. FIRST PRIORITY - ADDRESS TEXT: If the address on the card contains a city and/or country (e.g., "Dubai, UAE", "Mumbai, India", "123 Main St, Singapore"), extract the location from there. This is the most reliable source.
+2. SECOND PRIORITY - EMAIL DOMAIN: Check the email domain TLD (.ae = UAE, .jp = Japan, .sg = Singapore, .in = India, .uk = UK, .au = Australia, .de = Germany, etc.)
+3. THIRD PRIORITY - PHONE CODE: Check the phone country code (+971 = UAE, +65 = Singapore, +91 = India, +81 = Japan, +44 = UK, etc.)
+4. If none of the above work, leave location fields empty.
 
 Return a JSON object with these fields: name, title, company, phone (mobile only), email, address, notes, inferred_country, inferred_city.
 The "notes" field should contain any handwritten notes visible on the card.

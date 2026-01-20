@@ -5,7 +5,90 @@
 /* CardSnap CRM - Apple-inspired Glassmorphism Design System */
 
 @layer base {
+  /* Light mode (default) */
   :root {
+    /* Base colors - Clean white background */
+    --background: 0 0% 100%;
+    --foreground: 222 47% 11%;
+
+    /* Card surfaces */
+    --card: 0 0% 98%;
+    --card-foreground: 222 47% 11%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+
+    /* Primary - Vibrant blue */
+    --primary: 217 91% 55%;
+    --primary-foreground: 0 0% 100%;
+
+    /* Secondary */
+    --secondary: 220 14% 96%;
+    --secondary-foreground: 222 47% 11%;
+
+    --muted: 220 14% 96%;
+    --muted-foreground: 220 9% 46%;
+
+    --accent: 217 91% 55%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 217 91% 55%;
+
+    --radius: 1rem;
+
+    /* Chart colors - Apple-inspired vibrant palette */
+    --chart-1: 340 82% 52%;   /* Pink/Rose */
+    --chart-2: 25 95% 53%;    /* Orange */
+    --chart-3: 173 80% 40%;   /* Teal */
+    --chart-4: 262 83% 58%;   /* Purple */
+    --chart-5: 142 71% 45%;   /* Green */
+
+    /* Custom tokens for glassmorphism (light mode) */
+    --glass-bg: rgba(255, 255, 255, 0.8);
+    --glass-bg-hover: rgba(255, 255, 255, 0.9);
+    --glass-border: rgba(0, 0, 0, 0.1);
+    --glass-border-hover: rgba(0, 0, 0, 0.15);
+    
+    /* Category colors - Vibrant and readable */
+    --category-client: 160 84% 39%;
+    --category-prospect: 38 95% 50%;
+    --category-partner: 217 91% 55%;
+    --category-influencer: 328 85% 55%;
+    --category-random: 220 14% 50%;
+    
+    /* Action colors */
+    --success: 160 84% 39%;
+    --success-foreground: 0 0% 100%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 222 47% 11%;
+    
+    /* Gradient tokens */
+    --gradient-primary: linear-gradient(135deg, hsl(217, 91%, 55%), hsl(262, 83%, 58%));
+    --gradient-background: linear-gradient(180deg, hsl(220, 14%, 96%), hsl(0, 0%, 100%));
+    --gradient-card: linear-gradient(135deg, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0.7));
+    
+    /* Glow effects */
+    --glow-primary: 0 8px 32px -8px hsl(217, 91%, 55%, 0.3);
+    --glow-card: 0 4px 16px rgba(0, 0, 0, 0.08);
+
+    /* Sidebar */
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 222 47% 11%;
+    --sidebar-primary: 217 91% 55%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 220 14% 96%;
+    --sidebar-accent-foreground: 222 47% 11%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 217 91% 55%;
+  }
+
+  /* Dark mode */
+  .dark {
     /* Base colors - Deep slate gradient background */
     --background: 222 47% 11%;
     --foreground: 210 40% 98%;
@@ -38,7 +121,12 @@
     --input: 215 28% 20%;
     --ring: 217 91% 60%;
 
-    --radius: 1rem;
+    /* Chart colors - Apple-inspired vibrant palette */
+    --chart-1: 340 82% 60%;   /* Pink/Rose */
+    --chart-2: 25 95% 60%;    /* Orange */
+    --chart-3: 173 80% 50%;   /* Teal */
+    --chart-4: 262 83% 65%;   /* Purple */
+    --chart-5: 142 71% 55%;   /* Green */
 
     /* Custom tokens for glassmorphism */
     --glass-bg: rgba(255, 255, 255, 0.1);
@@ -46,12 +134,12 @@
     --glass-border: rgba(255, 255, 255, 0.2);
     --glass-border-hover: rgba(255, 255, 255, 0.3);
     
-    /* Category colors */
-    --category-client: 160 84% 39%;
-    --category-prospect: 38 92% 50%;
-    --category-partner: 217 91% 60%;
-    --category-influencer: 320 80% 65%;
-    --category-random: 215 20% 65%;
+    /* Category colors - Vibrant */
+    --category-client: 160 84% 45%;
+    --category-prospect: 38 95% 55%;
+    --category-partner: 217 91% 65%;
+    --category-influencer: 328 85% 65%;
+    --category-random: 220 14% 60%;
     
     /* Action colors */
     --success: 160 84% 39%;
@@ -60,7 +148,7 @@
     --warning-foreground: 210 40% 98%;
     
     /* Gradient tokens */
-    --gradient-primary: linear-gradient(135deg, hsl(217, 91%, 60%), hsl(271, 81%, 56%));
+    --gradient-primary: linear-gradient(135deg, hsl(217, 91%, 60%), hsl(262, 83%, 65%));
     --gradient-background: linear-gradient(180deg, hsl(222, 47%, 11%), hsl(217, 33%, 17%));
     --gradient-card: linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.05));
     
@@ -68,37 +156,7 @@
     --glow-primary: 0 8px 32px -8px hsl(217, 91%, 60%, 0.5);
     --glow-card: 0 8px 32px rgba(0, 0, 0, 0.3);
 
-    /* Sidebar - keeping for compatibility */
-    --sidebar-background: 222 47% 11%;
-    --sidebar-foreground: 210 40% 98%;
-    --sidebar-primary: 217 91% 60%;
-    --sidebar-primary-foreground: 210 40% 98%;
-    --sidebar-accent: 217 33% 17%;
-    --sidebar-accent-foreground: 210 40% 98%;
-    --sidebar-border: 215 28% 25%;
-    --sidebar-ring: 217 91% 60%;
-  }
-
-  .dark {
-    --background: 222 47% 11%;
-    --foreground: 210 40% 98%;
-    --card: 217 33% 17%;
-    --card-foreground: 210 40% 98%;
-    --popover: 217 33% 17%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 217 91% 60%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 215 28% 17%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 215 28% 17%;
-    --muted-foreground: 215 20% 65%;
-    --accent: 217 91% 60%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 62% 30%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 215 28% 25%;
-    --input: 215 28% 20%;
-    --ring: 217 91% 60%;
+    /* Sidebar */
     --sidebar-background: 222 47% 11%;
     --sidebar-foreground: 210 40% 98%;
     --sidebar-primary: 217 91% 60%;

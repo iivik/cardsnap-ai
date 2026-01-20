@@ -6,21 +6,30 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { Search, ChevronDown, ChevronRight, Users, ArrowUpDown } from "lucide-react";
+import { Search, ChevronDown, ChevronRight, Users, ArrowUpDown, User } from "lucide-react";
 import { RoleStats } from "@/lib/analytics-utils";
 import { cn } from "@/lib/utils";
 
+interface Contact {
+  id: string;
+  name: string;
+  company: string;
+  title: string | null;
+}
+
 interface RoleBreakdownProps {
   data: RoleStats[];
-  onTitleClick?: (title: string) => void;
+  contacts?: Contact[];
+  onContactClick?: (contactId: string) => void;
 }
 
 type SortMode = "count" | "alpha";
 
-export function RoleBreakdown({ data, onTitleClick }: RoleBreakdownProps) {
+export function RoleBreakdown({ data, contacts = [], onContactClick }: RoleBreakdownProps) {
   const [search, setSearch] = useState("");
   const [sortMode, setSortMode] = useState<SortMode>("count");
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+  const [expandedTitles, setExpandedTitles] = useState<Set<string>>(new Set());
 
   const toggleGroup = (group: string) => {
     setExpandedGroups(prev => {
@@ -32,6 +41,26 @@ export function RoleBreakdown({ data, onTitleClick }: RoleBreakdownProps) {
       }
       return next;
     });
+  };
+
+  const toggleTitle = (title: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setExpandedTitles(prev => {
+      const next = new Set(prev);
+      if (next.has(title)) {
+        next.delete(title);
+      } else {
+        next.add(title);
+      }
+      return next;
+    });
+  };
+
+  // Get contacts for a specific title
+  const getContactsForTitle = (title: string) => {
+    return contacts.filter(c => 
+      (c.title?.trim() || "No Title") === title
+    );
   };
 
   // Filter and sort data
@@ -80,7 +109,7 @@ export function RoleBreakdown({ data, onTitleClick }: RoleBreakdownProps) {
       {/* Role Groups */}
       <div className="space-y-2">
         {filteredData.map(group => {
-          const isExpanded = expandedGroups.has(group.group);
+          const isGroupExpanded = expandedGroups.has(group.group);
           const percentage = totalContacts > 0 
             ? ((group.total / totalContacts) * 100).toFixed(1) 
             : 0;
@@ -88,13 +117,13 @@ export function RoleBreakdown({ data, onTitleClick }: RoleBreakdownProps) {
           return (
             <Collapsible
               key={group.group}
-              open={isExpanded}
+              open={isGroupExpanded}
               onOpenChange={() => toggleGroup(group.group)}
             >
               <CollapsibleTrigger className="w-full">
                 <div className="flex items-center justify-between p-3 rounded-lg bg-secondary/30 hover:bg-secondary/50 transition-colors">
                   <div className="flex items-center gap-3">
-                    {isExpanded ? (
+                    {isGroupExpanded ? (
                       <ChevronDown className="h-4 w-4 text-muted-foreground" />
                     ) : (
                       <ChevronRight className="h-4 w-4 text-muted-foreground" />
@@ -109,24 +138,70 @@ export function RoleBreakdown({ data, onTitleClick }: RoleBreakdownProps) {
                 </div>
               </CollapsibleTrigger>
               <CollapsibleContent>
-                <div className="pl-10 pr-3 py-2 space-y-1">
-                  {group.titles.map(title => (
-                    <div
-                      key={title.title}
-                      className={cn(
-                        "flex items-center justify-between py-2 px-3 rounded-md text-sm",
-                        onTitleClick && "cursor-pointer hover:bg-secondary/50 transition-colors"
-                      )}
-                      onClick={() => onTitleClick?.(title.title)}
-                    >
-                      <span className="text-muted-foreground truncate flex-1">
-                        {title.title}
-                      </span>
-                      <span className="text-foreground font-medium ml-2">
-                        {title.count}
-                      </span>
-                    </div>
-                  ))}
+                <div className="pl-6 pr-3 py-2 space-y-1">
+                  {group.titles.map(title => {
+                    const isTitleExpanded = expandedTitles.has(title.title);
+                    const titleContacts = getContactsForTitle(title.title);
+
+                    return (
+                      <div key={title.title}>
+                        {/* Title row - clickable to expand */}
+                        <div
+                          className={cn(
+                            "flex items-center justify-between py-2 px-3 rounded-md text-sm cursor-pointer hover:bg-secondary/50 transition-colors",
+                            isTitleExpanded && "bg-secondary/30"
+                          )}
+                          onClick={(e) => toggleTitle(title.title, e)}
+                        >
+                          <div className="flex items-center gap-2 flex-1">
+                            {title.count > 0 ? (
+                              isTitleExpanded ? (
+                                <ChevronDown className="h-3 w-3 text-muted-foreground" />
+                              ) : (
+                                <ChevronRight className="h-3 w-3 text-muted-foreground" />
+                              )
+                            ) : (
+                              <div className="w-3" />
+                            )}
+                            <span className="text-muted-foreground truncate">
+                              {title.title}
+                            </span>
+                          </div>
+                          <span className="text-foreground font-medium ml-2">
+                            {title.count}
+                          </span>
+                        </div>
+
+                        {/* Expanded contacts list */}
+                        {isTitleExpanded && titleContacts.length > 0 && (
+                          <div className="ml-8 mt-1 space-y-1">
+                            {titleContacts.map(contact => (
+                              <div
+                                key={contact.id}
+                                className={cn(
+                                  "flex items-center gap-3 py-2 px-3 rounded-lg bg-secondary/20 border border-border/50",
+                                  onContactClick && "cursor-pointer hover:bg-secondary/40 transition-colors"
+                                )}
+                                onClick={() => onContactClick?.(contact.id)}
+                              >
+                                <div className="p-1.5 rounded-full bg-primary/20">
+                                  <User className="h-3 w-3 text-primary" />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-medium text-foreground truncate">
+                                    {contact.name}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground truncate">
+                                    {contact.company}
+                                  </p>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </CollapsibleContent>
             </Collapsible>
