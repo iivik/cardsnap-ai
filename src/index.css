@@ -291,4 +291,18 @@
   .animate-scan-line {
     animation: scan-line 2s ease-in-out infinite;
   }
+
+  /* Camera flash animation */
+  @keyframes camera-flash {
+    0% {
+      opacity: 1;
+    }
+    100% {
+      opacity: 0;
+    }
+  }
+
+  .animate-flash {
+    animation: camera-flash 150ms ease-out forwards;
+  }
 }

@@ -19,6 +19,7 @@ export function useCamera(options: UseCameraOptions = {}) {
   const [isCardDetected, setIsCardDetected] = useState(false);
   const [isCountingDown, setIsCountingDown] = useState(false);
   const [countdown, setCountdown] = useState(0);
+  const [isMuted, setIsMuted] = useState(false);
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -30,6 +31,37 @@ export function useCamera(options: UseCameraOptions = {}) {
 
   const enableAutoCapture = options.enableAutoCapture ?? true;
   const onAutoCapture = options.onAutoCapture;
+
+  // Play shutter sound using Web Audio API
+  const playShutterSound = useCallback(() => {
+    if (isMuted) return;
+    
+    try {
+      const audioContext = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
+      
+      // Create a short click sound
+      const oscillator = audioContext.createOscillator();
+      const gainNode = audioContext.createGain();
+      
+      oscillator.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+      
+      oscillator.frequency.setValueAtTime(800, audioContext.currentTime);
+      oscillator.frequency.exponentialRampToValueAtTime(200, audioContext.currentTime + 0.1);
+      
+      gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
+      
+      oscillator.start(audioContext.currentTime);
+      oscillator.stop(audioContext.currentTime + 0.1);
+    } catch (err) {
+      console.error("Failed to play shutter sound:", err);
+    }
+  }, [isMuted]);
+
+  const toggleMute = useCallback(() => {
+    setIsMuted(prev => !prev);
+  }, []);
 
   const checkCameraCapabilities = useCallback(async () => {
     try {
@@ -112,6 +144,8 @@ export function useCamera(options: UseCameraOptions = {}) {
               if (countdownIntervalRef.current) {
                 clearInterval(countdownIntervalRef.current);
               }
+              // Play shutter sound before capturing
+              playShutterSound();
               // Trigger auto-capture
               const imageData = captureImage();
               if (imageData && onAutoCapture) {
@@ -137,7 +171,7 @@ export function useCamera(options: UseCameraOptions = {}) {
     }
 
     lastFrameRef.current = currentFrame;
-  }, [enableAutoCapture, isCardDetected, isCountingDown, onAutoCapture]);
+  }, [enableAutoCapture, isCardDetected, isCountingDown, onAutoCapture, playShutterSound]);
 
   const startCamera = useCallback(async () => {
     setIsLoading(true);
@@ -295,10 +329,13 @@ export function useCamera(options: UseCameraOptions = {}) {
     isCardDetected,
     isCountingDown,
     countdown,
+    isMuted,
     startCamera,
     stopCamera,
     flipCamera,
     toggleTorch,
+    toggleMute,
     captureImage,
+    playShutterSound,
   };
 }

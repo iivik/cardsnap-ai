@@ -31,7 +31,8 @@ interface ExtractedData {
 interface LocationData {
   latitude: number | null;
   longitude: number | null;
-  location_name: string;
+  city: string;
+  country: string;
 }
 
 export default function Review() {
@@ -59,7 +60,8 @@ export default function Review() {
   const [locationData, setLocationData] = useState<LocationData>({
     latitude: null,
     longitude: null,
-    location_name: "",
+    city: "",
+    country: "",
   });
   const [isGettingLocation, setIsGettingLocation] = useState(false);
 
@@ -110,11 +112,10 @@ export default function Review() {
         );
         const data = await response.json();
         if (data.address) {
-          const city = data.address.city || data.address.town || data.address.village || "";
-          const country = data.address.country || "";
           setLocationData((prev) => ({
             ...prev,
-            location_name: [city, country].filter(Boolean).join(", "),
+            city: data.address.city || data.address.town || data.address.village || "",
+            country: data.address.country || "",
           }));
         }
       } catch (geoError) {
@@ -143,16 +144,17 @@ export default function Review() {
         user_id: user.id,
         name: formData.name.trim(),
         title: formData.title.trim() || null,
-        company: formData.company.trim() || "",
+        company: formData.company.trim() || "Unknown",
         phone: formData.phone.trim() || null,
-        email: formData.email.trim() || "",
+        email: formData.email.trim() || "unknown@example.com",
         address: formData.address.trim() || null,
-        notes: formData.handwritten_notes.trim() || null,
+        handwritten_notes: formData.handwritten_notes.trim() || null,
         category: category as "client" | "prospect_client" | "prospect_partner" | "partner" | "influencer" | "random",
         meeting_context: meetingContext as "office_my" | "office_client" | "office_partner" | "event" | "other",
-        latitude: locationData.latitude,
-        longitude: locationData.longitude,
-        location_name: locationData.location_name || null,
+        gps_latitude: locationData.latitude,
+        gps_longitude: locationData.longitude,
+        location_city: locationData.city || null,
+        location_country: locationData.country || null,
         card_image_url: imageUrl || null,
       }]).select().single();
 
@@ -340,10 +342,10 @@ export default function Review() {
           </div>
 
           {/* Location */}
-          {locationData.location_name && (
+          {(locationData.city || locationData.country) && (
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <MapPin className="h-4 w-4" />
-              <span>{locationData.location_name}</span>
+              <span>{[locationData.city, locationData.country].filter(Boolean).join(", ")}</span>
               {isGettingLocation && <Loader2 className="h-3 w-3 animate-spin" />}
             </div>
           )}

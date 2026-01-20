@@ -1,4 +1,4 @@
-import { X, Zap, ZapOff, SwitchCamera } from "lucide-react";
+import { X, Zap, ZapOff, SwitchCamera, Volume2, VolumeX } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -6,9 +6,11 @@ interface CameraControlsProps {
   onCancel: () => void;
   onFlip: () => void;
   onToggleTorch: () => void;
+  onToggleMute: () => void;
   torchOn: boolean;
   torchSupported: boolean;
   hasMultipleCameras: boolean;
+  isMuted: boolean;
   isCapturing?: boolean;
 }
 
@@ -16,9 +18,11 @@ export function CameraControls({
   onCancel,
   onFlip,
   onToggleTorch,
+  onToggleMute,
   torchOn,
   torchSupported,
   hasMultipleCameras,
+  isMuted,
   isCapturing,
 }: CameraControlsProps) {
   return (
@@ -37,6 +41,22 @@ export function CameraControls({
 
       {/* Right controls */}
       <div className="flex gap-2">
+        {/* Mute toggle */}
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={onToggleMute}
+          disabled={isCapturing}
+          className={cn(
+            "rounded-full backdrop-blur-sm",
+            isMuted
+              ? "bg-destructive/50 text-white hover:bg-destructive/60"
+              : "bg-black/20 text-white hover:bg-white/10"
+          )}
+        >
+          {isMuted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
+        </Button>
+
         {/* Torch toggle */}
         {torchSupported && (
           <Button

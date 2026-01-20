@@ -15,6 +15,12 @@ export default function Scan() {
   const navigate = useNavigate();
   const [isCapturing, setIsCapturing] = useState(false);
   const [cameraStarted, setCameraStarted] = useState(false);
+  const [isFlashing, setIsFlashing] = useState(false);
+
+  const triggerFlash = useCallback(() => {
+    setIsFlashing(true);
+    setTimeout(() => setIsFlashing(false), 150);
+  }, []);
 
   const handleAutoCapture = useCallback(async (imageData: string) => {
     if (isCapturing || !user) return;
@@ -70,12 +76,15 @@ export default function Scan() {
     isCardDetected,
     isCountingDown,
     countdown,
+    isMuted,
     startCamera,
     stopCamera,
     flipCamera,
     toggleTorch,
+    toggleMute,
     captureImage,
-  } = useCamera({ 
+    playShutterSound,
+  } = useCamera({
     facingMode: "environment",
     enableAutoCapture: true,
     onAutoCapture: handleAutoCapture,
@@ -111,6 +120,10 @@ export default function Scan() {
     if (isCapturing || !user) return;
 
     setIsCapturing(true);
+    
+    // Trigger flash and sound
+    triggerFlash();
+    playShutterSound();
 
     try {
       // Capture image from video
@@ -156,7 +169,7 @@ export default function Scan() {
     } finally {
       setIsCapturing(false);
     }
-  }, [isCapturing, user, captureImage, stopCamera, navigate]);
+  }, [isCapturing, user, captureImage, stopCamera, navigate, triggerFlash, playShutterSound]);
 
   if (authLoading) {
     return (
@@ -205,6 +218,11 @@ export default function Scan() {
         </div>
       )}
 
+      {/* Flash overlay */}
+      {isFlashing && (
+        <div className="absolute inset-0 bg-white z-50 animate-flash pointer-events-none" />
+      )}
+
       {/* Video preview */}
       <video
         ref={videoRef}
@@ -221,9 +239,11 @@ export default function Scan() {
             onCancel={handleCancel}
             onFlip={flipCamera}
             onToggleTorch={toggleTorch}
+            onToggleMute={toggleMute}
             torchOn={torchOn}
             torchSupported={torchSupported}
             hasMultipleCameras={hasMultipleCameras}
+            isMuted={isMuted}
             isCapturing={isCapturing}
           />
 
