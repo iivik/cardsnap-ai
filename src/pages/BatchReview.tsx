@@ -22,6 +22,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Progress } from "@/components/ui/progress";
 import {
   Loader2,
   CheckCircle2,
@@ -34,7 +35,10 @@ import {
   MapPin,
   StickyNote,
   AlertTriangle,
+  ChevronLeft,
+  ChevronRight,
   Home,
+  Sparkles,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -65,6 +69,14 @@ interface ExtractedData {
   handwritten_notes: string;
 }
 
+interface CapturedCard {
+  imageUrl: string;
+  imagePath: string;
+  extractedData?: ExtractedData;
+  isProcessing?: boolean;
+  isProcessed?: boolean;
+}
+
 interface LocationData {
   latitude: number | null;
   longitude: number | null;
@@ -79,17 +91,20 @@ interface DuplicateContact {
   email: string;
 }
 
-export default function Review() {
+export default function BatchReview() {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const { imageUrl, imagePath, extractedData, locationData: passedLocation } = (location.state as {
-    imageUrl?: string;
-    imagePath?: string;
-    extractedData?: ExtractedData;
+  const { cards: initialCards, locationData: passedLocation } = (location.state as {
+    cards?: CapturedCard[];
     locationData?: LocationData;
   }) || {};
 
+  const [cards, setCards] = useState<CapturedCard[]>([]);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [isProcessingAll, setIsProcessingAll] = useState(false);
+  const [processingIndex, setProcessingIndex] = useState(-1);
+  
   const [formData, setFormData] = useState<ExtractedData>({
     name: "",
     title: "",
@@ -109,82 +124,109 @@ export default function Review() {
     city: "",
     country: "",
   });
-  const [isGettingLocation, setIsGettingLocation] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [duplicateContact, setDuplicateContact] = useState<DuplicateContact | null>(null);
   const [showDuplicateDialog, setShowDuplicateDialog] = useState(false);
-  const [pendingNavigation, setPendingNavigation] = useState<"contacts" | "scan" | null>(null);
+  const [savedCount, setSavedCount] = useState(0);
 
+  // Initialize cards and location
   useEffect(() => {
     if (!authLoading && !user) {
       navigate("/auth");
       return;
     }
 
-    if (!authLoading && user && !imageUrl) {
+    if (!authLoading && user && (!initialCards || initialCards.length === 0)) {
       navigate("/scan");
       return;
     }
 
-    if (extractedData) {
-      setFormData(extractedData);
-    }
-
-    // Use passed location or get fresh location
-    if (passedLocation && (passedLocation.city || passedLocation.country)) {
-      setLocationData(passedLocation);
-    } else {
-      getLocation();
+    if (initialCards) {
+      setCards(initialCards);
+      if (passedLocation) {
+        setLocationData(passedLocation);
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, authLoading, imageUrl, extractedData, passedLocation]);
+  }, [user, authLoading, initialCards]);
 
-  const getLocation = async () => {
-    if (!navigator.geolocation) return;
-
-    setIsGettingLocation(true);
-    try {
-      const position = await new Promise<GeolocationPosition>((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(resolve, reject, {
-          enableHighAccuracy: true,
-          timeout: 10000,
-          maximumAge: 0,
-        });
-      });
-
-      const { latitude, longitude } = position.coords;
-      setLocationData((prev) => ({
-        ...prev,
-        latitude,
-        longitude,
-      }));
-
-      // Reverse geocode to get location name
-      try {
-        const response = await fetch(
-          `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`
-        );
-        const data = await response.json();
-        if (data.address) {
-          setLocationData((prev) => ({
-            ...prev,
-            city: data.address.city || data.address.town || data.address.village || "",
-            country: data.address.country || "",
-          }));
-        }
-      } catch (geoError) {
-        console.error("Reverse geocoding failed:", geoError);
-      }
-    } catch (err) {
-      console.error("Location error:", err);
-    } finally {
-      setIsGettingLocation(false);
+  // Process all cards with AI extraction
+  useEffect(() => {
+    if (cards.length > 0 && !isProcessingAll && cards.some(c => !c.isProcessed)) {
+      processAllCards();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cards.length]);
+
+  const processAllCards = async () => {
+    setIsProcessingAll(true);
+    
+    for (let i = 0; i < cards.length; i++) {
+      if (cards[i].isProcessed) continue;
+      
+      setProcessingIndex(i);
+      
+      try {
+        const { data, error } = await supabase.functions.invoke("extract-card", {
+          body: { imageUrl: cards[i].imageUrl },
+        });
+
+        if (error) throw error;
+
+        const extractedData: ExtractedData = data?.data || {
+          name: "",
+          title: "",
+          company: "",
+          phone: "",
+          email: "",
+          address: "",
+          handwritten_notes: "",
+        };
+
+        setCards(prev => prev.map((card, idx) => 
+          idx === i 
+            ? { ...card, extractedData, isProcessed: true, isProcessing: false }
+            : card
+        ));
+      } catch (err) {
+        console.error(`Error processing card ${i}:`, err);
+        setCards(prev => prev.map((card, idx) => 
+          idx === i 
+            ? { ...card, extractedData: { name: "", title: "", company: "", phone: "", email: "", address: "", handwritten_notes: "" }, isProcessed: true, isProcessing: false }
+            : card
+        ));
+      }
+    }
+    
+    setProcessingIndex(-1);
+    setIsProcessingAll(true);
   };
+
+  // Load current card data into form
+  useEffect(() => {
+    const currentCard = cards[currentIndex];
+    if (currentCard?.extractedData) {
+      setFormData(currentCard.extractedData);
+    } else {
+      setFormData({
+        name: "",
+        title: "",
+        company: "",
+        phone: "",
+        email: "",
+        address: "",
+        handwritten_notes: "",
+      });
+    }
+    // Reset category and meeting context for each card
+    setCategory("random");
+    setMeetingContext("");
+    setMeetingContextOther("");
+    setErrors({});
+  }, [currentIndex, cards]);
 
   const handleChange = (field: keyof ExtractedData, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
-    // Clear error when user types
     if (errors[field]) {
       setErrors((prev) => ({ ...prev, [field]: "" }));
     }
@@ -238,9 +280,7 @@ export default function Review() {
     }
   };
 
-  const deleteCardImage = async () => {
-    if (!imagePath) return;
-
+  const deleteCardImage = async (imagePath: string) => {
     try {
       const { error } = await supabase.storage
         .from("card-images")
@@ -254,12 +294,15 @@ export default function Review() {
     }
   };
 
-  const saveContact = async (navigateTo: "contacts" | "scan") => {
-    if (!user) return;
+  const saveCurrentCard = async (): Promise<boolean> => {
+    if (!user) return false;
+
+    const currentCard = cards[currentIndex];
+    if (!currentCard) return false;
 
     setIsSaving(true);
     try {
-      const { data, error } = await supabase.from("contacts").insert([{
+      const { error } = await supabase.from("contacts").insert([{
         user_id: user.id,
         name: formData.name.trim(),
         title: formData.title.trim() || null,
@@ -275,30 +318,26 @@ export default function Review() {
         gps_longitude: locationData.longitude,
         location_city: locationData.city || null,
         location_country: locationData.country || null,
-        card_image_url: imageUrl || null,
-      }]).select().single();
+        card_image_url: currentCard.imageUrl || null,
+      }]);
 
       if (error) throw error;
 
       // Delete temporary card image from storage
-      await deleteCardImage();
+      await deleteCardImage(currentCard.imagePath);
 
-      toast.success("Contact saved successfully!");
-      
-      if (navigateTo === "contacts") {
-        navigate("/contacts");
-      } else {
-        navigate("/scan");
-      }
+      setSavedCount(prev => prev + 1);
+      return true;
     } catch (err) {
       console.error("Save error:", err);
       toast.error("Failed to save contact. Please try again.");
+      return false;
     } finally {
       setIsSaving(false);
     }
   };
 
-  const handleSave = async (navigateTo: "contacts" | "scan") => {
+  const handleSaveAndNext = async () => {
     if (!validateForm()) {
       toast.error("Please fill in all required fields");
       return;
@@ -308,20 +347,31 @@ export default function Review() {
     const duplicate = await checkForDuplicates();
     if (duplicate) {
       setDuplicateContact(duplicate);
-      setPendingNavigation(navigateTo);
       setShowDuplicateDialog(true);
       return;
     }
 
-    await saveContact(navigateTo);
+    const success = await saveCurrentCard();
+    if (success) {
+      toast.success(`Contact saved (${savedCount + 1}/${cards.length})`);
+      
+      if (currentIndex < cards.length - 1) {
+        setCurrentIndex(prev => prev + 1);
+      } else {
+        // All cards saved
+        navigate("/contacts");
+      }
+    }
   };
 
   const handleMergeDuplicate = async () => {
     if (!user || !duplicateContact) return;
 
+    const currentCard = cards[currentIndex];
+    if (!currentCard) return;
+
     setIsSaving(true);
     try {
-      // Update existing contact with new data
       const { error } = await supabase
         .from("contacts")
         .update({
@@ -339,22 +389,22 @@ export default function Review() {
           gps_longitude: locationData.longitude,
           location_city: locationData.city || null,
           location_country: locationData.country || null,
-          card_image_url: imageUrl || null,
+          card_image_url: currentCard.imageUrl || null,
         })
         .eq("id", duplicateContact.id);
 
       if (error) throw error;
 
-      // Delete temporary card image
-      await deleteCardImage();
-
+      await deleteCardImage(currentCard.imagePath);
+      
+      setSavedCount(prev => prev + 1);
       toast.success("Contact updated successfully!");
       setShowDuplicateDialog(false);
       
-      if (pendingNavigation === "contacts") {
-        navigate("/contacts");
+      if (currentIndex < cards.length - 1) {
+        setCurrentIndex(prev => prev + 1);
       } else {
-        navigate("/scan");
+        navigate("/contacts");
       }
     } catch (err) {
       console.error("Merge error:", err);
@@ -366,8 +416,27 @@ export default function Review() {
 
   const handleCreateNew = async () => {
     setShowDuplicateDialog(false);
-    if (pendingNavigation) {
-      await saveContact(pendingNavigation);
+    const success = await saveCurrentCard();
+    if (success) {
+      toast.success(`Contact saved (${savedCount + 1}/${cards.length})`);
+      
+      if (currentIndex < cards.length - 1) {
+        setCurrentIndex(prev => prev + 1);
+      } else {
+        navigate("/contacts");
+      }
+    }
+  };
+
+  const goToPrevious = () => {
+    if (currentIndex > 0) {
+      setCurrentIndex(prev => prev - 1);
+    }
+  };
+
+  const goToNext = () => {
+    if (currentIndex < cards.length - 1) {
+      setCurrentIndex(prev => prev + 1);
     }
   };
 
@@ -379,42 +448,76 @@ export default function Review() {
     );
   }
 
-  if (!user || !imageUrl) return null;
+  if (!user || cards.length === 0) return null;
 
+  const currentCard = cards[currentIndex];
+  const isCurrentCardProcessing = processingIndex === currentIndex;
   const locationDisplay = [locationData.city, locationData.country].filter(Boolean).join(", ");
+  const isLastCard = currentIndex === cards.length - 1;
+  const progressPercent = ((savedCount) / cards.length) * 100;
 
   return (
     <div className="fixed inset-0 bg-background flex flex-col">
-      {/* Card Image Preview - Top 30% */}
-      <div className="h-[30vh] relative flex-shrink-0 bg-black/50">
-        <img
-          src={imageUrl}
-          alt="Business card"
-          className="w-full h-full object-contain"
-        />
-        <div className="absolute inset-0 bg-gradient-to-b from-transparent to-background/80 pointer-events-none" />
-        
-        {/* Top buttons */}
-        <div className="absolute top-4 left-4 right-4 flex justify-between">
+      {/* Progress Header */}
+      <div className="flex-shrink-0 p-4 border-b border-border bg-background/90 backdrop-blur-lg">
+        <div className="flex items-center justify-between mb-2">
           <Button
-            variant="outline"
+            variant="ghost"
             size="sm"
             onClick={() => navigate("/")}
-            className="gap-2 bg-black/50 backdrop-blur-sm border-white/20 text-white hover:bg-black/70"
+            className="gap-2"
           >
             <Home className="h-4 w-4" />
             Home
           </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => navigate("/scan")}
-            className="gap-2 bg-black/50 backdrop-blur-sm border-white/20 text-white hover:bg-black/70"
-          >
-            <Camera className="h-4 w-4" />
-            Retake
-          </Button>
+          <span className="text-sm text-muted-foreground">
+            Card {currentIndex + 1} of {cards.length}
+          </span>
+          <div className="flex gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={goToPrevious}
+              disabled={currentIndex === 0}
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={goToNext}
+              disabled={currentIndex === cards.length - 1}
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
+        <Progress value={progressPercent} className="h-2" />
+        <p className="text-xs text-muted-foreground mt-1 text-center">
+          {savedCount} of {cards.length} saved
+        </p>
+      </div>
+
+      {/* Card Image Preview - Top 30% */}
+      <div className="h-[25vh] relative flex-shrink-0 bg-black/50">
+        {currentCard && (
+          <img
+            src={currentCard.imageUrl}
+            alt="Business card"
+            className="w-full h-full object-contain"
+          />
+        )}
+        <div className="absolute inset-0 bg-gradient-to-b from-transparent to-background/80 pointer-events-none" />
+        
+        {/* Processing overlay */}
+        {isCurrentCardProcessing && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+            <div className="text-center space-y-2">
+              <Sparkles className="h-8 w-8 text-primary animate-pulse mx-auto" />
+              <p className="text-white text-sm">Extracting...</p>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Scrollable Form - Middle */}
@@ -432,6 +535,7 @@ export default function Review() {
               onChange={(e) => handleChange("name", e.target.value)}
               placeholder="Full name"
               className={`bg-secondary/50 ${errors.name ? "border-destructive" : ""}`}
+              disabled={isCurrentCardProcessing}
             />
             {errors.name && <p className="text-xs text-destructive">{errors.name}</p>}
           </div>
@@ -448,6 +552,7 @@ export default function Review() {
               onChange={(e) => handleChange("title", e.target.value)}
               placeholder="Job title"
               className="bg-secondary/50"
+              disabled={isCurrentCardProcessing}
             />
           </div>
 
@@ -463,6 +568,7 @@ export default function Review() {
               onChange={(e) => handleChange("company", e.target.value)}
               placeholder="Company name"
               className={`bg-secondary/50 ${errors.company ? "border-destructive" : ""}`}
+              disabled={isCurrentCardProcessing}
             />
             {errors.company && <p className="text-xs text-destructive">{errors.company}</p>}
           </div>
@@ -480,6 +586,7 @@ export default function Review() {
               onChange={(e) => handleChange("phone", e.target.value)}
               placeholder="Phone number"
               className="bg-secondary/50"
+              disabled={isCurrentCardProcessing}
             />
           </div>
 
@@ -496,6 +603,7 @@ export default function Review() {
               onChange={(e) => handleChange("email", e.target.value)}
               placeholder="Email address"
               className={`bg-secondary/50 ${errors.email ? "border-destructive" : ""}`}
+              disabled={isCurrentCardProcessing}
             />
             {errors.email && <p className="text-xs text-destructive">{errors.email}</p>}
           </div>
@@ -513,6 +621,7 @@ export default function Review() {
               placeholder="Address"
               rows={2}
               className="bg-secondary/50 resize-none"
+              disabled={isCurrentCardProcessing}
             />
           </div>
 
@@ -529,6 +638,7 @@ export default function Review() {
               placeholder="Any notes from the card..."
               rows={2}
               className="bg-secondary/50 resize-none"
+              disabled={isCurrentCardProcessing}
             />
           </div>
 
@@ -539,12 +649,7 @@ export default function Review() {
               Location
             </Label>
             <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-secondary/30 text-sm text-muted-foreground">
-              {isGettingLocation ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  <span>Getting location...</span>
-                </>
-              ) : locationDisplay ? (
+              {locationDisplay ? (
                 <span>{locationDisplay}</span>
               ) : (
                 <span className="italic">Location not available</span>
@@ -560,7 +665,7 @@ export default function Review() {
             <Select value={meetingContext} onValueChange={(v) => {
               setMeetingContext(v);
               if (errors.meetingContext) setErrors((prev) => ({ ...prev, meetingContext: "" }));
-            }}>
+            }} disabled={isCurrentCardProcessing}>
               <SelectTrigger className={`bg-secondary/50 ${errors.meetingContext ? "border-destructive" : ""}`}>
                 <SelectValue placeholder="Where did you meet?" />
               </SelectTrigger>
@@ -590,6 +695,7 @@ export default function Review() {
                 }}
                 placeholder="Describe where you met..."
                 className={`bg-secondary/50 ${errors.meetingContextOther ? "border-destructive" : ""}`}
+                disabled={isCurrentCardProcessing}
               />
               {errors.meetingContextOther && <p className="text-xs text-destructive">{errors.meetingContextOther}</p>}
             </div>
@@ -603,7 +709,7 @@ export default function Review() {
             <Select value={category} onValueChange={(v) => {
               setCategory(v);
               if (errors.category) setErrors((prev) => ({ ...prev, category: "" }));
-            }}>
+            }} disabled={isCurrentCardProcessing}>
               <SelectTrigger className={`bg-secondary/50 ${errors.category ? "border-destructive" : ""}`}>
                 <SelectValue placeholder="Select category" />
               </SelectTrigger>
@@ -622,36 +728,20 @@ export default function Review() {
 
       {/* Bottom Buttons - Fixed */}
       <div className="fixed bottom-0 left-0 right-0 p-4 bg-background/90 backdrop-blur-lg border-t border-border">
-        <div className="flex gap-3">
-          <Button
-            onClick={() => handleSave("scan")}
-            disabled={isSaving}
-            variant="outline"
-            className="flex-1 gap-2 bg-primary/10 border-primary/30 hover:bg-primary/20"
-            size="lg"
-          >
-            {isSaving ? (
-              <Loader2 className="h-5 w-5 animate-spin" />
-            ) : (
-              <Camera className="h-5 w-5" />
-            )}
-            Continue Scanning
-          </Button>
-          <Button
-            onClick={() => handleSave("contacts")}
-            disabled={isSaving}
-            className="flex-1 gap-2"
-            size="lg"
-            style={{ backgroundColor: "hsl(var(--success))", color: "hsl(var(--success-foreground))" }}
-          >
-            {isSaving ? (
-              <Loader2 className="h-5 w-5 animate-spin" />
-            ) : (
-              <CheckCircle2 className="h-5 w-5" />
-            )}
-            Process & Done
-          </Button>
-        </div>
+        <Button
+          onClick={handleSaveAndNext}
+          disabled={isSaving || isCurrentCardProcessing}
+          className="w-full gap-2"
+          size="lg"
+          style={{ backgroundColor: "hsl(var(--success))", color: "hsl(var(--success-foreground))" }}
+        >
+          {isSaving ? (
+            <Loader2 className="h-5 w-5 animate-spin" />
+          ) : (
+            <CheckCircle2 className="h-5 w-5" />
+          )}
+          {isLastCard ? "Save & Finish" : "Save & Next"}
+        </Button>
       </div>
 
       {/* Duplicate Detection Dialog */}

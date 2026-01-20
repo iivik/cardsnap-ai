@@ -6,9 +6,23 @@ import { supabase } from "@/integrations/supabase/client";
 import { CameraOverlay } from "@/components/camera/CameraOverlay";
 import { CameraControls } from "@/components/camera/CameraControls";
 import { CaptureButton } from "@/components/camera/CaptureButton";
-import { Loader2, Camera, AlertCircle } from "lucide-react";
+import { Loader2, Camera, AlertCircle, X, Check, Layers } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
+
+interface CapturedCard {
+  imageUrl: string;
+  imagePath: string;
+}
+
+interface LocationData {
+  latitude: number | null;
+  longitude: number | null;
+  city: string;
+  country: string;
+}
 
 export default function Scan() {
   const { user, loading: authLoading } = useAuth();
@@ -16,16 +30,72 @@ export default function Scan() {
   const [isCapturing, setIsCapturing] = useState(false);
   const [cameraStarted, setCameraStarted] = useState(false);
   const [isFlashing, setIsFlashing] = useState(false);
+  
+  // Batch mode state
+  const [isBatchMode, setIsBatchMode] = useState(false);
+  const [capturedCards, setCapturedCards] = useState<CapturedCard[]>([]);
+  
+  // Location state - captured once when camera starts
+  const [locationData, setLocationData] = useState<LocationData>({
+    latitude: null,
+    longitude: null,
+    city: "",
+    country: "",
+  });
+  const [isGettingLocation, setIsGettingLocation] = useState(false);
 
   const triggerFlash = useCallback(() => {
     setIsFlashing(true);
     setTimeout(() => setIsFlashing(false), 150);
   }, []);
 
-  const handleAutoCapture = useCallback(async (imageData: string) => {
-    if (isCapturing || !user) return;
-    
-    setIsCapturing(true);
+  // Get location when camera starts
+  const getLocation = useCallback(async () => {
+    if (!navigator.geolocation) return;
+
+    setIsGettingLocation(true);
+    try {
+      const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 0,
+        });
+      });
+
+      const { latitude, longitude } = position.coords;
+      setLocationData((prev) => ({
+        ...prev,
+        latitude,
+        longitude,
+      }));
+
+      // Reverse geocode to get city/country
+      try {
+        const response = await fetch(
+          `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`
+        );
+        const data = await response.json();
+        if (data.address) {
+          setLocationData((prev) => ({
+            ...prev,
+            city: data.address.city || data.address.town || data.address.village || "",
+            country: data.address.country || "",
+          }));
+        }
+      } catch (geoError) {
+        console.error("Reverse geocoding failed:", geoError);
+      }
+    } catch (err) {
+      console.error("Location error:", err);
+    } finally {
+      setIsGettingLocation(false);
+    }
+  }, []);
+
+  const uploadCardImage = useCallback(async (imageData: string): Promise<CapturedCard | null> => {
+    if (!user) return null;
+
     try {
       // Convert base64 to blob
       const response = await fetch(imageData);
@@ -42,28 +112,53 @@ export default function Scan() {
           upsert: false,
         });
 
-      if (error) {
-        throw error;
-      }
+      if (error) throw error;
 
       // Get public URL
       const { data: urlData } = supabase.storage
         .from("card-images")
         .getPublicUrl(data.path);
 
-      // Stop camera before navigating
-      stopCamera();
+      return {
+        imageUrl: urlData.publicUrl,
+        imagePath: data.path,
+      };
+    } catch (err) {
+      console.error("Upload error:", err);
+      throw err;
+    }
+  }, [user]);
 
-      // Navigate to processing page with image URL
-      navigate("/processing", {
-        state: { imageUrl: urlData.publicUrl, imagePath: data.path },
-      });
+  const handleAutoCapture = useCallback(async (imageData: string) => {
+    if (isCapturing || !user) return;
+    
+    setIsCapturing(true);
+    try {
+      const cardData = await uploadCardImage(imageData);
+      if (!cardData) throw new Error("Failed to upload image");
+
+      if (isBatchMode) {
+        // In batch mode, add to queue
+        setCapturedCards(prev => [...prev, cardData]);
+        toast.success(`Card ${capturedCards.length + 1} captured!`);
+        setIsCapturing(false);
+      } else {
+        // Single mode - navigate to processing
+        stopCamera();
+        navigate("/processing", {
+          state: { 
+            imageUrl: cardData.imageUrl, 
+            imagePath: cardData.imagePath,
+            locationData 
+          },
+        });
+      }
     } catch (err) {
       console.error("Auto-capture error:", err);
       toast.error("Failed to capture image. Please try again.");
       setIsCapturing(false);
     }
-  }, [isCapturing, user, navigate]);
+  }, [isCapturing, user, isBatchMode, capturedCards.length, uploadCardImage, locationData, navigate]);
 
   const {
     videoRef,
@@ -96,13 +191,14 @@ export default function Scan() {
     }
   }, [user, authLoading, navigate]);
 
-  // Start camera when component mounts
+  // Start camera and get location when component mounts
   useEffect(() => {
     if (user && !cameraStarted) {
       startCamera();
+      getLocation();
       setCameraStarted(true);
     }
-  }, [user, cameraStarted, startCamera]);
+  }, [user, cameraStarted, startCamera, getLocation]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -132,44 +228,53 @@ export default function Scan() {
         throw new Error("Failed to capture image");
       }
 
-      // Convert base64 to blob
-      const response = await fetch(imageData);
-      const blob = await response.blob();
+      const cardData = await uploadCardImage(imageData);
+      if (!cardData) throw new Error("Failed to upload image");
 
-      // Generate unique filename
-      const filename = `${user.id}/${Date.now()}-card.jpg`;
-
-      // Upload to Supabase Storage
-      const { data, error } = await supabase.storage
-        .from("card-images")
-        .upload(filename, blob, {
-          contentType: "image/jpeg",
-          upsert: false,
+      if (isBatchMode) {
+        // In batch mode, add to queue
+        setCapturedCards(prev => [...prev, cardData]);
+        toast.success(`Card ${capturedCards.length + 1} captured!`);
+        setIsCapturing(false);
+      } else {
+        // Single mode - navigate to processing
+        stopCamera();
+        navigate("/processing", {
+          state: { 
+            imageUrl: cardData.imageUrl, 
+            imagePath: cardData.imagePath,
+            locationData 
+          },
         });
-
-      if (error) {
-        throw error;
       }
-
-      // Get public URL
-      const { data: urlData } = supabase.storage
-        .from("card-images")
-        .getPublicUrl(data.path);
-
-      // Stop camera before navigating
-      stopCamera();
-
-      // Navigate to processing page with image URL
-      navigate("/processing", {
-        state: { imageUrl: urlData.publicUrl, imagePath: data.path },
-      });
     } catch (err) {
       console.error("Capture error:", err);
       toast.error("Failed to capture image. Please try again.");
-    } finally {
       setIsCapturing(false);
     }
-  }, [isCapturing, user, captureImage, stopCamera, navigate, triggerFlash, playShutterSound]);
+  }, [isCapturing, user, captureImage, stopCamera, navigate, triggerFlash, playShutterSound, isBatchMode, capturedCards.length, uploadCardImage, locationData]);
+
+  const handleRemoveCard = useCallback((index: number) => {
+    setCapturedCards(prev => prev.filter((_, i) => i !== index));
+  }, []);
+
+  const handleProcessBatch = useCallback(() => {
+    if (capturedCards.length === 0) {
+      toast.error("No cards captured yet");
+      return;
+    }
+    
+    stopCamera();
+    navigate("/batch-review", {
+      state: {
+        cards: capturedCards.map(card => ({
+          ...card,
+          isProcessed: false,
+        })),
+        locationData,
+      },
+    });
+  }, [capturedCards, locationData, stopCamera, navigate]);
 
   if (authLoading) {
     return (
@@ -232,6 +337,26 @@ export default function Scan() {
         className="absolute inset-0 w-full h-full object-cover"
       />
 
+      {/* Batch Mode Toggle */}
+      {stream && (
+        <div className="absolute top-16 left-1/2 -translate-x-1/2 z-30">
+          <div className="flex items-center gap-3 px-4 py-2 rounded-full bg-black/60 backdrop-blur-sm border border-white/20">
+            <Label htmlFor="batch-mode" className="text-white text-sm cursor-pointer">
+              Single
+            </Label>
+            <Switch
+              id="batch-mode"
+              checked={isBatchMode}
+              onCheckedChange={setIsBatchMode}
+            />
+            <Label htmlFor="batch-mode" className="text-white text-sm cursor-pointer flex items-center gap-1">
+              <Layers className="h-4 w-4" />
+              Batch
+            </Label>
+          </div>
+        </div>
+      )}
+
       {/* Camera controls */}
       {stream && (
         <>
@@ -259,6 +384,56 @@ export default function Scan() {
             disabled={!stream}
           />
         </>
+      )}
+
+      {/* Batch Mode: Captured Cards Strip */}
+      {isBatchMode && capturedCards.length > 0 && (
+        <div className="absolute bottom-32 left-0 right-0 z-30 px-4">
+          <div className="flex gap-2 overflow-x-auto pb-2">
+            {capturedCards.map((card, index) => (
+              <div key={index} className="relative flex-shrink-0">
+                <img
+                  src={card.imageUrl}
+                  alt={`Card ${index + 1}`}
+                  className="w-16 h-10 object-cover rounded-lg border-2 border-white/50"
+                />
+                <button
+                  onClick={() => handleRemoveCard(index)}
+                  className="absolute -top-2 -right-2 w-5 h-5 bg-destructive rounded-full flex items-center justify-center"
+                >
+                  <X className="h-3 w-3 text-white" />
+                </button>
+                <span className="absolute bottom-0 left-0 right-0 text-center text-[10px] text-white bg-black/50 rounded-b-lg">
+                  {index + 1}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Batch Mode: Process Button */}
+      {isBatchMode && capturedCards.length > 0 && (
+        <div className="absolute bottom-36 right-4 z-30">
+          <Button
+            onClick={handleProcessBatch}
+            className="gap-2"
+            style={{ backgroundColor: "hsl(var(--success))", color: "hsl(var(--success-foreground))" }}
+          >
+            <Check className="h-4 w-4" />
+            Done ({capturedCards.length})
+          </Button>
+        </div>
+      )}
+
+      {/* Location indicator */}
+      {isGettingLocation && (
+        <div className="absolute top-28 left-1/2 -translate-x-1/2 z-30">
+          <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-black/60 backdrop-blur-sm text-white/70 text-xs">
+            <Loader2 className="h-3 w-3 animate-spin" />
+            Getting location...
+          </div>
+        </div>
       )}
 
       {/* Not started state */}

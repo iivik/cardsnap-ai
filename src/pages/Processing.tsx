@@ -22,7 +22,11 @@ export default function Processing() {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const { imageUrl, imagePath } = (location.state as { imageUrl?: string; imagePath?: string }) || {};
+  const { imageUrl, imagePath, locationData } = (location.state as { 
+    imageUrl?: string; 
+    imagePath?: string;
+    locationData?: { latitude: number | null; longitude: number | null; city: string; country: string };
+  }) || {};
 
   const [steps, setSteps] = useState<{ label: string; status: StepStatus }[]>([
     { label: "Scanning image", status: "active" },
@@ -90,6 +94,7 @@ export default function Processing() {
           imageUrl,
           imagePath,
           extractedData,
+          locationData,
         },
       });
     } catch (err) {
@@ -126,6 +131,7 @@ export default function Processing() {
           address: "",
           handwritten_notes: "",
         },
+        locationData,
       },
     });
   };
