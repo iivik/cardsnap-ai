@@ -8,6 +8,7 @@ import { StatCard } from "@/components/analytics/StatCard";
 import { CategoryChart } from "@/components/analytics/CategoryChart";
 import { RoleBreakdown } from "@/components/analytics/RoleBreakdown";
 import { LocationTree } from "@/components/analytics/LocationTree";
+import { WordCloud } from "@/components/analytics/WordCloud";
 import { DrillDownModal } from "@/components/analytics/DrillDownModal";
 import {
   Users,
@@ -16,6 +17,7 @@ import {
   Briefcase,
   Loader2,
   TrendingUp,
+  Sparkles,
 } from "lucide-react";
 import {
   aggregateLocations,
@@ -114,6 +116,13 @@ export default function Analytics() {
     setDrillDownOpen(true);
   };
 
+  const handleWordClick = (word: string, type: string, matchingContacts: Contact[]) => {
+    setDrillDownTitle(word);
+    setDrillDownSubtitle(`${matchingContacts.length} contact${matchingContacts.length !== 1 ? 's' : ''} • ${type}`);
+    setDrillDownContacts(matchingContacts);
+    setDrillDownOpen(true);
+  };
+
   if (authLoading) {
     return (
       <AppLayout>
@@ -170,11 +179,12 @@ export default function Analytics() {
 
             {/* Tabs */}
             <Tabs value={activeTab} onValueChange={setActiveTab}>
-              <TabsList className="grid w-full grid-cols-4 bg-secondary/50">
+              <TabsList className="grid w-full grid-cols-5 bg-secondary/50">
                 <TabsTrigger value="overview" className="text-xs">Overview</TabsTrigger>
-                <TabsTrigger value="roles" className="text-xs">By Role</TabsTrigger>
-                <TabsTrigger value="location" className="text-xs">By Location</TabsTrigger>
-                <TabsTrigger value="category" className="text-xs">By Category</TabsTrigger>
+                <TabsTrigger value="insights" className="text-xs">Insights</TabsTrigger>
+                <TabsTrigger value="roles" className="text-xs">Roles</TabsTrigger>
+                <TabsTrigger value="location" className="text-xs">Location</TabsTrigger>
+                <TabsTrigger value="category" className="text-xs">Category</TabsTrigger>
               </TabsList>
 
               {/* Overview Tab */}
@@ -217,6 +227,20 @@ export default function Analytics() {
                       </div>
                     ))}
                   </div>
+                </div>
+              </TabsContent>
+
+              {/* Insights Tab - Word Cloud */}
+              <TabsContent value="insights" className="mt-4">
+                <div className="glass-card p-4">
+                  <h3 className="text-sm font-medium mb-4 flex items-center gap-2">
+                    <Sparkles className="h-4 w-4 text-primary" />
+                    Network Word Cloud
+                  </h3>
+                  <WordCloud 
+                    contacts={contacts}
+                    onWordClick={handleWordClick}
+                  />
                 </div>
               </TabsContent>
 

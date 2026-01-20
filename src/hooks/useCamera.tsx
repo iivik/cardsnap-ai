@@ -15,7 +15,7 @@ export function useCamera(options: UseCameraOptions = {}) {
   );
   const [hasMultipleCameras, setHasMultipleCameras] = useState(false);
   const [torchSupported, setTorchSupported] = useState(false);
-  const [torchOn, setTorchOn] = useState(false);
+  const [flashMode, setFlashMode] = useState<'auto' | 'on' | 'off'>('off');
   const [isCardDetected, setIsCardDetected] = useState(false);
   const [isCountingDown, setIsCountingDown] = useState(false);
   const [countdown, setCountdown] = useState(0);
@@ -119,8 +119,8 @@ export function useCamera(options: UseCameraOptions = {}) {
       }
 
       const avgDiff = diff / (sampleSize / 64);
-      const isStable = avgDiff < 25; // Threshold for stability (lowered from 15 for more forgiving detection)
-      const hasContent = edgeSum > 5000; // Threshold for detecting content (lowered from 10000)
+      const isStable = avgDiff < 35; // Threshold for stability (more forgiving detection)
+      const hasContent = edgeSum > 3000; // Threshold for detecting content (lowered for better detection)
 
       if (isStable && hasContent) {
         stabilityCountRef.current++;
@@ -130,8 +130,8 @@ export function useCamera(options: UseCameraOptions = {}) {
           setIsCardDetected(true);
         }
         
-        // Start countdown after 4 stable frames (~1.2s)
-        if (stabilityCountRef.current === 4 && !isCountingDown && onAutoCapture) {
+        // Start countdown after 3 stable frames (~900ms)
+        if (stabilityCountRef.current === 3 && !isCountingDown && onAutoCapture) {
           setIsCountingDown(true);
           setCountdown(3);
           
@@ -260,33 +260,67 @@ export function useCamera(options: UseCameraOptions = {}) {
     setFacingMode((prev) => (prev === "user" ? "environment" : "user"));
   }, []);
 
-  const toggleTorch = useCallback(async () => {
-    if (!stream || !torchSupported) return;
+  const cycleFlashMode = useCallback(() => {
+    setFlashMode(prev => {
+      if (prev === 'off') return 'auto';
+      if (prev === 'auto') return 'on';
+      return 'off';
+    });
+  }, []);
 
+  // Apply torch state based on flash mode
+  const applyTorch = useCallback(async (on: boolean) => {
+    if (!stream || !torchSupported) return;
     try {
       const videoTrack = stream.getVideoTracks()[0];
-      const newTorchState = !torchOn;
       await videoTrack.applyConstraints({
-        advanced: [{ torch: newTorchState } as MediaTrackConstraintSet],
+        advanced: [{ torch: on } as MediaTrackConstraintSet],
       });
-      setTorchOn(newTorchState);
     } catch (err) {
       console.error("Failed to toggle torch:", err);
     }
-  }, [stream, torchSupported, torchOn]);
+  }, [stream, torchSupported]);
+
+  // Keep torch on when flash mode is 'on'
+  useEffect(() => {
+    if (flashMode === 'on') {
+      applyTorch(true);
+    } else if (flashMode === 'off') {
+      applyTorch(false);
+    }
+    // 'auto' mode: torch is off by default, will flash during capture
+  }, [flashMode, applyTorch]);
 
   const captureImage = useCallback((): string | null => {
     if (!videoRef.current) return null;
 
     const video = videoRef.current;
     const canvas = document.createElement("canvas");
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-
     const ctx = canvas.getContext("2d");
     if (!ctx) return null;
 
-    ctx.drawImage(video, 0, 0);
+    // Calculate the card region (same as CameraOverlay)
+    // Business card aspect ratio: 1.75:1 (standard business card)
+    const videoWidth = video.videoWidth;
+    const videoHeight = video.videoHeight;
+    
+    // Card region: 85% width, centered, aspect ratio 1.75:1
+    const cardWidth = videoWidth * 0.85;
+    const cardHeight = cardWidth / 1.75;
+    const cardX = (videoWidth - cardWidth) / 2;
+    const cardY = (videoHeight - cardHeight) / 2;
+
+    // Set canvas to card dimensions (landscape)
+    canvas.width = cardWidth;
+    canvas.height = cardHeight;
+
+    // Draw only the card region (cropped to business card area)
+    ctx.drawImage(
+      video,
+      cardX, cardY, cardWidth, cardHeight,  // Source region
+      0, 0, cardWidth, cardHeight            // Destination
+    );
+
     return canvas.toDataURL("image/jpeg", 0.9);
   }, []);
 
@@ -325,7 +359,7 @@ export function useCamera(options: UseCameraOptions = {}) {
     facingMode,
     hasMultipleCameras,
     torchSupported,
-    torchOn,
+    flashMode,
     isCardDetected,
     isCountingDown,
     countdown,
@@ -333,7 +367,8 @@ export function useCamera(options: UseCameraOptions = {}) {
     startCamera,
     stopCamera,
     flipCamera,
-    toggleTorch,
+    cycleFlashMode,
+    applyTorch,
     toggleMute,
     captureImage,
     playShutterSound,

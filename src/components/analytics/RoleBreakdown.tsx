@@ -6,7 +6,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { Search, ChevronDown, ChevronRight, Users, ArrowUpDown, User } from "lucide-react";
+import { Search, ChevronRight, Users, ArrowUpDown, User } from "lucide-react";
 import { RoleStats } from "@/lib/analytics-utils";
 import { cn } from "@/lib/utils";
 
@@ -116,11 +116,10 @@ export function RoleBreakdown({ data, contacts = [], onContactClick }: RoleBreak
               <CollapsibleTrigger className="w-full">
                 <div className="flex items-center justify-between p-3 rounded-lg bg-secondary/30 hover:bg-secondary/50 transition-colors">
                   <div className="flex items-center gap-3">
-                    {isGroupExpanded ? (
-                      <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                    ) : (
-                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                    )}
+                    <ChevronRight className={cn(
+                      "h-4 w-4 text-muted-foreground transition-transform duration-200",
+                      isGroupExpanded && "rotate-90"
+                    )} />
                     <Users className="h-4 w-4 text-primary" />
                     <span className="font-medium text-sm">{group.group}</span>
                   </div>
@@ -148,11 +147,10 @@ export function RoleBreakdown({ data, contacts = [], onContactClick }: RoleBreak
                         >
                           <div className="flex items-center gap-2 flex-1">
                             {title.count > 0 ? (
-                              isTitleExpanded ? (
-                                <ChevronDown className="h-3 w-3 text-muted-foreground" />
-                              ) : (
-                                <ChevronRight className="h-3 w-3 text-muted-foreground" />
-                              )
+                              <ChevronRight className={cn(
+                                "h-3 w-3 text-muted-foreground transition-transform duration-200",
+                                isTitleExpanded && "rotate-90"
+                              )} />
                             ) : (
                               <div className="w-3" />
                             )}
