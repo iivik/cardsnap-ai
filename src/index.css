@@ -274,4 +274,21 @@
     -webkit-text-fill-color: transparent;
     background-clip: text;
   }
+
+  /* Scan line animation for processing page */
+  @keyframes scan-line {
+    0% {
+      top: 0;
+    }
+    50% {
+      top: calc(100% - 4px);
+    }
+    100% {
+      top: 0;
+    }
+  }
+
+  .animate-scan-line {
+    animation: scan-line 2s ease-in-out infinite;
+  }
 }
