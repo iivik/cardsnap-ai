@@ -357,6 +357,22 @@ export default function Scan() {
         </div>
       )}
 
+      {/* Auto-capture status indicator */}
+      {stream && !isCapturing && (
+        <div className="absolute top-28 left-1/2 -translate-x-1/2 z-30">
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/60 backdrop-blur-sm text-white/90 text-xs">
+            <div className={`w-2 h-2 rounded-full ${isCardDetected ? 'bg-green-400' : 'bg-amber-400 animate-pulse'}`} />
+            {isCountingDown ? (
+              <span className="font-medium">Capturing in {countdown}...</span>
+            ) : isCardDetected ? (
+              <span>Card detected</span>
+            ) : (
+              <span>Scanning for card...</span>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Camera controls */}
       {stream && (
         <>

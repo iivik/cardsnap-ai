@@ -1,4 +1,4 @@
-import { Home, Camera, Users, Settings } from "lucide-react";
+import { Home, Camera, Users, Settings, BarChart3 } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 
@@ -6,6 +6,7 @@ const navItems = [
   { icon: Home, label: "Home", path: "/" },
   { icon: Camera, label: "Scan", path: "/scan" },
   { icon: Users, label: "Contacts", path: "/contacts" },
+  { icon: BarChart3, label: "Analytics", path: "/analytics" },
   { icon: Settings, label: "Settings", path: "/settings" },
 ];
 
