@@ -1,14 +1,17 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTheme } from "next-themes";
 import { useAuth } from "@/hooks/useAuth";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { GlassCard } from "@/components/ui/GlassCard";
+import { supabase } from "@/integrations/supabase/client";
+import { exportMultipleToPhone } from "@/lib/export-utils";
+import { toast } from "sonner";
 import {
   User,
   Bell,
   Shield,
-  Download,
+  Share2,
   HelpCircle,
   LogOut,
   ChevronRight,
@@ -24,6 +27,7 @@ export default function Settings() {
   const { user, loading: authLoading, signOut } = useAuth();
   const navigate = useNavigate();
   const { theme, setTheme } = useTheme();
+  const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -34,6 +38,34 @@ export default function Settings() {
   const handleSignOut = async () => {
     await signOut();
     navigate("/auth");
+  };
+
+  const handleExportAll = async () => {
+    if (!user) return;
+    
+    setExporting(true);
+    try {
+      const { data, error } = await supabase
+        .from("contacts")
+        .select("*")
+        .eq("user_id", user.id);
+
+      if (error) throw error;
+
+      if (data && data.length > 0) {
+        const success = await exportMultipleToPhone(data);
+        if (success) {
+          toast.success(`${data.length} contacts ready to save to your phone`);
+        }
+      } else {
+        toast.error("No contacts to export");
+      }
+    } catch (error) {
+      console.error("Export failed:", error);
+      toast.error("Failed to export contacts");
+    } finally {
+      setExporting(false);
+    }
   };
 
   if (authLoading) {
@@ -56,9 +88,15 @@ export default function Settings() {
       ],
     },
     {
-      title: "Data",
+      title: "Data & Export",
       items: [
-        { icon: Download, label: "Export Contacts", description: "Download your CRM data" },
+        { 
+          icon: Share2, 
+          label: "Export All Contacts", 
+          description: "Save all contacts to your phone",
+          action: handleExportAll,
+          loading: exporting,
+        },
       ],
     },
     {
@@ -140,21 +178,31 @@ export default function Settings() {
                 {group.title}
               </h2>
               <GlassCard className="divide-y divide-border p-0" hover={false}>
-                {group.items.map(({ icon: Icon, label, description }) => (
-                  <button
-                    key={label}
-                    className="w-full flex items-center gap-4 p-4 hover:bg-secondary/50 transition-colors first:rounded-t-2xl last:rounded-b-2xl"
-                  >
-                    <div className="p-2 rounded-xl bg-secondary/50">
-                      <Icon className="h-5 w-5 text-foreground" />
-                    </div>
-                    <div className="flex-1 text-left">
-                      <p className="font-medium text-foreground">{label}</p>
-                      <p className="text-sm text-muted-foreground">{description}</p>
-                    </div>
-                    <ChevronRight className="h-5 w-5 text-muted-foreground" />
-                  </button>
-                ))}
+                {group.items.map((item) => {
+                  const Icon = item.icon;
+                  const isLoading = 'loading' in item && item.loading;
+                  return (
+                    <button
+                      key={item.label}
+                      onClick={'action' in item ? item.action : undefined}
+                      disabled={isLoading}
+                      className="w-full flex items-center gap-4 p-4 hover:bg-secondary/50 transition-colors first:rounded-t-2xl last:rounded-b-2xl disabled:opacity-50"
+                    >
+                      <div className="p-2 rounded-xl bg-secondary/50">
+                        {isLoading ? (
+                          <Loader2 className="h-5 w-5 text-foreground animate-spin" />
+                        ) : (
+                          <Icon className="h-5 w-5 text-foreground" />
+                        )}
+                      </div>
+                      <div className="flex-1 text-left">
+                        <p className="font-medium text-foreground">{item.label}</p>
+                        <p className="text-sm text-muted-foreground">{item.description}</p>
+                      </div>
+                      <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                    </button>
+                  );
+                })}
               </GlassCard>
             </section>
           ))}

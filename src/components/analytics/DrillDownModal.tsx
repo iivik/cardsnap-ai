@@ -7,7 +7,9 @@ import {
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
-import { User, Building2, MapPin, ExternalLink } from "lucide-react";
+import { exportMultipleToPhone } from "@/lib/export-utils";
+import { toast } from "sonner";
+import { User, Building2, MapPin, ExternalLink, Share2 } from "lucide-react";
 
 interface Contact {
   id: string;
@@ -41,14 +43,36 @@ export function DrillDownModal({
     navigate(`/contacts/${contactId}`);
   };
 
+  const handleExport = async () => {
+    if (contacts.length === 0) return;
+    
+    const success = await exportMultipleToPhone(contacts);
+    if (success) {
+      toast.success(`${contacts.length} contacts ready to save`);
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg max-h-[80vh]">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <User className="h-5 w-5 text-primary" />
-            {title}
-          </DialogTitle>
+          <div className="flex items-center justify-between pr-8">
+            <DialogTitle className="flex items-center gap-2">
+              <User className="h-5 w-5 text-primary" />
+              {title}
+            </DialogTitle>
+            {contacts.length > 0 && (
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={handleExport}
+                className="flex items-center gap-2"
+              >
+                <Share2 className="h-4 w-4" />
+                Export ({contacts.length})
+              </Button>
+            )}
+          </div>
           {subtitle && (
             <p className="text-sm text-muted-foreground">{subtitle}</p>
           )}
