@@ -70,31 +70,36 @@ function generateVCard(contact: ExportContact): string {
  */
 export async function exportToPhoneContacts(contact: ExportContact): Promise<boolean> {
   const vcard = generateVCard(contact);
-  const blob = new Blob([vcard], { type: 'text/vcard' });
   const fileName = `${contact.name.replace(/[^a-zA-Z0-9]/g, '-')}.vcf`;
-  const file = new File([blob], fileName, { type: 'text/vcard' });
-
-  // Check if Web Share API supports file sharing
-  if (navigator.share && navigator.canShare?.({ files: [file] })) {
-    try {
-      await navigator.share({
-        files: [file],
-        title: contact.name,
-        text: `Contact: ${contact.name}`
-      });
-      return true;
-    } catch (err) {
-      // User cancelled the share
-      if ((err as Error).name === 'AbortError') {
-        return false;
+  
+  // Try multiple MIME types for better Android compatibility
+  const mimeTypes = ['text/vcard', 'text/x-vcard', 'text/directory'];
+  
+  // Try Web Share API first with different MIME types
+  for (const mimeType of mimeTypes) {
+    const blob = new Blob([vcard], { type: mimeType });
+    const file = new File([blob], fileName, { type: mimeType });
+    
+    if (navigator.share && navigator.canShare?.({ files: [file] })) {
+      try {
+        await navigator.share({
+          files: [file],
+          title: contact.name,
+          text: `Contact: ${contact.name}`
+        });
+        return true;
+      } catch (err) {
+        if ((err as Error).name === 'AbortError') {
+          return false;
+        }
+        console.error('Share failed with MIME type:', mimeType, err);
+        // Try next MIME type
       }
-      console.error('Share failed:', err);
-      // Fall through to download fallback
     }
   }
   
-  // Fallback: download the file
-  downloadBlob(blob, fileName);
+  // Fallback: download the file using data URI (better Android support)
+  downloadVCard(vcard, fileName);
   return true;
 }
 
@@ -105,32 +110,54 @@ export async function exportMultipleToPhone(contacts: ExportContact[]): Promise<
   if (contacts.length === 0) return false;
 
   const vcards = contacts.map(generateVCard).join('\r\n');
-  const blob = new Blob([vcards], { type: 'text/vcard' });
   const fileName = `CardSnap-contacts-${contacts.length}.vcf`;
-  const file = new File([blob], fileName, { type: 'text/vcard' });
-
-  // Check if Web Share API supports file sharing
-  if (navigator.share && navigator.canShare?.({ files: [file] })) {
-    try {
-      await navigator.share({ files: [file] });
-      return true;
-    } catch (err) {
-      // User cancelled the share
-      if ((err as Error).name === 'AbortError') {
-        return false;
+  
+  // Try multiple MIME types for better Android compatibility
+  const mimeTypes = ['text/vcard', 'text/x-vcard', 'text/directory'];
+  
+  for (const mimeType of mimeTypes) {
+    const blob = new Blob([vcards], { type: mimeType });
+    const file = new File([blob], fileName, { type: mimeType });
+    
+    if (navigator.share && navigator.canShare?.({ files: [file] })) {
+      try {
+        await navigator.share({ files: [file] });
+        return true;
+      } catch (err) {
+        if ((err as Error).name === 'AbortError') {
+          return false;
+        }
+        console.error('Share failed with MIME type:', mimeType, err);
       }
-      console.error('Share failed:', err);
-      // Fall through to download fallback
     }
   }
   
-  // Fallback: download the file
-  downloadBlob(blob, fileName);
+  // Fallback: download the file using data URI
+  downloadVCard(vcards, fileName);
   return true;
 }
 
 /**
- * Helper to trigger file download
+ * Helper to download vCard using data URI (better Android browser support)
+ */
+function downloadVCard(vcardContent: string, fileName: string): void {
+  // Use data URI instead of blob URL for better Android compatibility
+  const dataUri = 'data:text/vcard;charset=utf-8,' + encodeURIComponent(vcardContent);
+  const a = document.createElement('a');
+  a.href = dataUri;
+  a.download = fileName;
+  a.style.display = 'none';
+  document.body.appendChild(a);
+  a.click();
+  
+  // Cleanup after a short delay
+  setTimeout(() => {
+    document.body.removeChild(a);
+  }, 100);
+}
+
+/**
+ * Helper to trigger file download (legacy fallback)
  */
 function downloadBlob(blob: Blob, fileName: string): void {
   const url = URL.createObjectURL(blob);
