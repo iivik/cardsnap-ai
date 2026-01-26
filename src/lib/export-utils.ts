@@ -141,19 +141,26 @@ export async function exportMultipleToPhone(contacts: ExportContact[]): Promise<
  * Helper to download vCard using data URI (better Android browser support)
  */
 function downloadVCard(vcardContent: string, fileName: string): void {
-  // Use data URI instead of blob URL for better Android compatibility
-  const dataUri = 'data:text/vcard;charset=utf-8,' + encodeURIComponent(vcardContent);
+  // Create blob with proper MIME type for Android
+  const blob = new Blob([vcardContent], { type: 'text/vcard;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  
   const a = document.createElement('a');
-  a.href = dataUri;
+  a.href = url;
   a.download = fileName;
   a.style.display = 'none';
   document.body.appendChild(a);
-  a.click();
   
-  // Cleanup after a short delay
+  // Trigger download with a slight delay for Android compatibility
+  setTimeout(() => {
+    a.click();
+  }, 50);
+  
+  // Cleanup
   setTimeout(() => {
     document.body.removeChild(a);
-  }, 100);
+    URL.revokeObjectURL(url);
+  }, 1000);
 }
 
 /**
