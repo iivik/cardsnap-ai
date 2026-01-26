@@ -40,13 +40,13 @@ export function ContactCard({ contact, onClick }: ContactCardProps) {
         {/* Content */}
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-2">
-            <div>
+            <div className="min-w-0 flex-1">
               <h3 className="font-semibold text-foreground truncate">{contact.name}</h3>
               {contact.title && (
                 <p className="text-sm text-muted-foreground truncate">{contact.title}</p>
               )}
             </div>
-            <CategoryBadge category={contact.category} />
+            <CategoryBadge category={contact.category} className="flex-shrink-0" />
           </div>
 
           <div className="mt-3 space-y-1.5">
