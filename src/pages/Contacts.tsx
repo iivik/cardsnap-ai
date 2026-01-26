@@ -112,6 +112,7 @@ export default function Contacts() {
       company: c.company,
       email: c.email,
       phone: c.phone,
+      category: c.category,
     }));
 
     try {
