@@ -216,37 +216,67 @@ export default function ContactDetail() {
             </div>
 
             <div className="flex items-center gap-3">
-              <div className="p-2 rounded-xl bg-white/10">
-                <Mail className="h-5 w-5 text-foreground" />
-              </div>
-              <div>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  window.location.href = `mailto:${contact.email}`;
+                }}
+                className="p-2 rounded-xl bg-primary/20 active:scale-95 transition-transform touch-manipulation"
+                aria-label="Send email"
+              >
+                <Mail className="h-5 w-5 text-primary" />
+              </button>
+              <div 
+                className="flex-1 cursor-pointer"
+                onClick={() => window.location.href = `mailto:${contact.email}`}
+              >
                 <p className="text-sm text-muted-foreground">Email</p>
-                <a href={`mailto:${contact.email}`} className="font-medium text-primary">
-                  {contact.email}
-                </a>
+                <p className="font-medium text-foreground">{contact.email}</p>
               </div>
             </div>
 
             {contact.phone && (
               <div className="flex items-center gap-3">
-                <div className="p-2 rounded-xl bg-white/10">
-                  <Phone className="h-5 w-5 text-foreground" />
-                </div>
-                <div>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    window.location.href = `tel:${contact.phone}`;
+                  }}
+                  className="p-2 rounded-xl bg-primary/20 active:scale-95 transition-transform touch-manipulation"
+                  aria-label="Call phone"
+                >
+                  <Phone className="h-5 w-5 text-primary" />
+                </button>
+                <div 
+                  className="flex-1 cursor-pointer"
+                  onClick={() => window.location.href = `tel:${contact.phone}`}
+                >
                   <p className="text-sm text-muted-foreground">Phone</p>
-                  <a href={`tel:${contact.phone}`} className="font-medium text-primary">
-                    {contact.phone}
-                  </a>
+                  <p className="font-medium text-foreground">{contact.phone}</p>
                 </div>
               </div>
             )}
 
             {contact.address && (
               <div className="flex items-center gap-3">
-                <div className="p-2 rounded-xl bg-white/10">
-                  <MapPin className="h-5 w-5 text-foreground" />
-                </div>
-                <div>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const query = encodeURIComponent(contact.address || '');
+                    window.open(`https://www.google.com/maps/search/?api=1&query=${query}`, '_blank');
+                  }}
+                  className="p-2 rounded-xl bg-primary/20 active:scale-95 transition-transform touch-manipulation"
+                  aria-label="Open in maps"
+                >
+                  <MapPin className="h-5 w-5 text-primary" />
+                </button>
+                <div 
+                  className="flex-1 cursor-pointer"
+                  onClick={() => {
+                    const query = encodeURIComponent(contact.address || '');
+                    window.open(`https://www.google.com/maps/search/?api=1&query=${query}`, '_blank');
+                  }}
+                >
                   <p className="text-sm text-muted-foreground">Address</p>
                   <p className="font-medium text-foreground">{contact.address}</p>
                 </div>
