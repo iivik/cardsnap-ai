@@ -1,156 +1,122 @@
 
 
-## Plan: Make Contact Icons Tappable with Visual Distinction
+## Plan: Fix Phone and Email Links for Mobile Browsers
 
-### Overview
+### Problem Summary
 
-Transform the contact detail view so that the icons (phone, email, location) become the primary tap targets. Making them blue creates a clear visual affordance that they're interactive, while keeping the text readable and allowing long-press copy/paste.
+The current implementation uses `window.location.href` for `tel:` and `mailto:` protocols, which causes:
+- **Android (Comet/WebView)**: `net::ERR_UNKNOWN_URL_SCHEME` error - WebView treats these as web navigation
+- **iOS Safari**: Taps on phone/email icons do nothing - Safari blocks programmatic navigation to non-web protocols
+- **Address link works**: Because it uses `window.open` with a standard `https://` URL
 
-### Design Approach
+### Root Cause
 
-**Visual Changes:**
-- Phone icon: Blue colored, tappable → opens dialer
-- Email icon: Blue colored, tappable → opens email client  
-- Location/Address icon: Blue colored, tappable → opens Google Maps
-- Company icon: Remains neutral (no action)
+Android WebView-based browsers do not natively handle non-web protocols like `tel:` or `mailto:`. When `window.location.href` is used, the browser attempts to navigate to these URIs as if they were web pages, resulting in the error.
 
-**Interaction Model:**
-- Tap on icon → triggers the respective action (call, email, maps)
-- Tap on text → also triggers the action (larger touch target)
-- Long press on text → browser-controlled copy/paste menu
+iOS Safari has similar restrictions and may silently block `window.location.href` assignments for non-standard protocols within click handlers.
 
-### Technical Details
+### Solution
+
+Replace JavaScript-based navigation with native `<a>` tags. Browsers universally recognize `<a href="tel:...">` and `<a href="mailto:...">` as protocol handlers and will correctly invoke the dialer or email client.
+
+### Technical Changes
 
 **File: `src/pages/ContactDetail.tsx`**
 
-For each actionable row (email, phone, address), the icon container will be converted to a tappable button with:
+Replace the current `<button>` and `<div onClick>` pattern with proper `<a>` tags:
 
-1. **Blue icon color**: `text-primary` instead of `text-foreground`
-2. **Subtle blue background tint**: `bg-primary/20` instead of `bg-white/10`
-3. **Explicit onClick handler**: Using `window.location.href` for reliable protocol handling
-4. **Touch feedback**: `active:scale-95` for visual confirmation
-5. **Accessibility**: `role="button"` and `aria-label` for screen readers
-
-**Email Row (lines 218-228):**
+**Email Row (lines 218-236):**
 ```tsx
-<div className="flex items-center gap-3">
-  <button
-    onClick={(e) => {
-      e.stopPropagation();
-      window.location.href = `mailto:${contact.email}`;
-    }}
-    className="p-2 rounded-xl bg-primary/20 active:scale-95 transition-transform touch-manipulation"
-    aria-label="Send email"
-  >
+<a 
+  href={`mailto:${contact.email}`}
+  className="flex items-center gap-3 -mx-2 px-2 py-1 rounded-lg active:bg-white/10 transition-colors touch-manipulation"
+>
+  <div className="p-2 rounded-xl bg-primary/20">
     <Mail className="h-5 w-5 text-primary" />
-  </button>
-  <div 
-    className="flex-1 cursor-pointer"
-    onClick={() => window.location.href = `mailto:${contact.email}`}
-  >
-    <p className="text-sm text-muted-foreground">Email</p>
-    <p className="font-medium text-foreground">{contact.email}</p>
   </div>
-</div>
+  <div className="flex-1 min-w-0">
+    <p className="text-sm text-muted-foreground">Email</p>
+    <p className="font-medium text-foreground break-all">{contact.email}</p>
+  </div>
+</a>
 ```
 
-**Phone Row (lines 230-242):**
+**Phone Row (lines 238-258):**
 ```tsx
 {contact.phone && (
-  <div className="flex items-center gap-3">
-    <button
-      onClick={(e) => {
-        e.stopPropagation();
-        window.location.href = `tel:${contact.phone}`;
-      }}
-      className="p-2 rounded-xl bg-primary/20 active:scale-95 transition-transform touch-manipulation"
-      aria-label="Call phone"
-    >
+  <a 
+    href={`tel:${contact.phone}`}
+    className="flex items-center gap-3 -mx-2 px-2 py-1 rounded-lg active:bg-white/10 transition-colors touch-manipulation"
+  >
+    <div className="p-2 rounded-xl bg-primary/20">
       <Phone className="h-5 w-5 text-primary" />
-    </button>
-    <div 
-      className="flex-1 cursor-pointer"
-      onClick={() => window.location.href = `tel:${contact.phone}`}
-    >
+    </div>
+    <div className="flex-1">
       <p className="text-sm text-muted-foreground">Phone</p>
       <p className="font-medium text-foreground">{contact.phone}</p>
     </div>
-  </div>
+  </a>
 )}
 ```
 
-**Address Row (lines 244-254):**
+**Address Row (lines 260-284):**
+Keep using `window.open` since Google Maps requires an HTTPS URL, but wrap the entire row in a clickable container for consistency:
 ```tsx
 {contact.address && (
-  <div className="flex items-center gap-3">
-    <button
-      onClick={(e) => {
-        e.stopPropagation();
-        const query = encodeURIComponent(contact.address || '');
-        window.open(`https://www.google.com/maps/search/?api=1&query=${query}`, '_blank');
-      }}
-      className="p-2 rounded-xl bg-primary/20 active:scale-95 transition-transform touch-manipulation"
-      aria-label="Open in maps"
-    >
+  <a 
+    href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(contact.address || '')}`}
+    target="_blank"
+    rel="noopener noreferrer"
+    className="flex items-center gap-3 -mx-2 px-2 py-1 rounded-lg active:bg-white/10 transition-colors touch-manipulation"
+  >
+    <div className="p-2 rounded-xl bg-primary/20">
       <MapPin className="h-5 w-5 text-primary" />
-    </button>
-    <div 
-      className="flex-1 cursor-pointer"
-      onClick={() => {
-        const query = encodeURIComponent(contact.address || '');
-        window.open(`https://www.google.com/maps/search/?api=1&query=${query}`, '_blank');
-      }}
-    >
+    </div>
+    <div className="flex-1">
       <p className="text-sm text-muted-foreground">Address</p>
       <p className="font-medium text-foreground">{contact.address}</p>
     </div>
-  </div>
+  </a>
 )}
 ```
 
-**Company Row (lines 208-216):**
-Remains unchanged - company is not actionable.
-
-### Visual Summary
-
-| Field | Icon Color | Icon Background | Tap Action |
-|-------|------------|-----------------|------------|
-| Company | Gray (neutral) | `bg-white/10` | None |
-| Email | Blue (primary) | `bg-primary/20` | Opens email client |
-| Phone | Blue (primary) | `bg-primary/20` | Opens phone dialer |
-| Address | Blue (primary) | `bg-primary/20` | Opens Google Maps |
-
 ### Why This Works
 
-1. **Clear Visual Affordance**: Blue icons signal interactivity, following iOS/Android conventions where blue typically means "tappable"
+| Current Approach | New Approach |
+|------------------|--------------|
+| `<button onClick={() => window.location.href = 'tel:...'>` | `<a href="tel:...">` |
+| WebView treats as navigation request | Browser recognizes as protocol handler |
+| Fails with `ERR_UNKNOWN_URL_SCHEME` | Opens native dialer/email client |
 
-2. **Dual Tap Target**: Both the icon AND the text area are tappable, maximizing touch accessibility
+1. **Native `<a>` tags**: Browsers universally recognize anchor tags with `tel:` and `mailto:` hrefs as intent triggers, not web navigation
+2. **No JavaScript needed**: The browser/OS handles protocol detection natively without any JavaScript involvement
+3. **Consistent pattern**: All three rows (email, phone, address) now use the same `<a>` tag pattern
+4. **Touch feedback preserved**: `active:bg-white/10` provides visual tap feedback
+5. **Long press works**: Native anchor tags preserve browser-controlled long-press behavior for copy/paste
 
-3. **Touch Feedback**: `active:scale-95` provides instant visual feedback confirming the tap was registered
+### Visual Design
 
-4. **`touch-manipulation`**: Eliminates the 300ms delay on mobile browsers
-
-5. **Protocol Handling**: `window.location.href` for `tel:` and `mailto:` ensures compatibility with Android WebView browsers like Comet
-
-6. **Google Maps Integration**: Using the universal `maps/search` URL works on all platforms - Android opens Google Maps app if installed, iOS opens Apple Maps or prompts, desktop opens browser
-
-7. **Long Press Preserved**: Since we're not preventing default text selection behavior, long press to copy/paste remains browser-controlled
+The blue icon styling is preserved:
+- Icons remain `text-primary` (blue)
+- Icon backgrounds remain `bg-primary/20` (subtle blue tint)
+- The entire row is tappable with visual feedback on press
 
 ### Files Modified
 
 1. **`src/pages/ContactDetail.tsx`**
-   - Update email row with blue tappable icon
-   - Update phone row with blue tappable icon  
-   - Update address row with blue tappable icon + Google Maps link
-   - Company row unchanged (not actionable)
+   - Replace email button+div with single `<a>` tag
+   - Replace phone button+div with single `<a>` tag
+   - Replace address button+div with single `<a>` tag (keeping `target="_blank"`)
 
 ### Testing Checklist
 
-- [ ] Android: Tap blue phone icon → opens dialer
-- [ ] Android: Tap blue email icon → opens email client
-- [ ] Android: Tap blue location icon → opens Google Maps
-- [ ] iOS: Same behaviors as Android
-- [ ] Long press on text → copy menu appears (browser-controlled)
-- [ ] Visual: Blue icons have subtle blue background tint
-- [ ] Visual: Tap shows scale-down feedback
+After implementation, verify:
+- [ ] Android Comet: Tap phone row → opens dialer (no error)
+- [ ] Android Comet: Tap email row → opens email client (no error)
+- [ ] Android Comet: Tap address row → opens Google Maps
+- [ ] iOS Safari: Tap phone row → opens dialer
+- [ ] iOS Safari: Tap email row → opens Mail app
+- [ ] iOS Safari: Tap address row → opens Maps
+- [ ] Desktop: All links work as expected
+- [ ] Long press on any row → copy menu appears
 
