@@ -81,9 +81,16 @@ export default function Settings() {
       if (error) throw error;
 
       if (data && data.length > 0) {
-        const success = await exportMultipleToPhone(data);
-        if (success) {
-          toast.success(`${data.length} contacts ready to save to your phone`);
+        try {
+          const success = await exportMultipleToPhone(data);
+          if (success) {
+            toast.success(`${data.length} contacts ready to save to your phone`);
+          } else {
+            toast.error("Export cancelled");
+          }
+        } catch (exportError) {
+          console.error('Export failed:', exportError);
+          toast.error("Unable to export contacts. Please try again.");
         }
       } else {
         toast.error("No contacts to export");

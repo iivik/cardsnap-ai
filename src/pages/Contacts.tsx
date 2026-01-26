@@ -114,9 +114,16 @@ export default function Contacts() {
       phone: c.phone,
     }));
 
-    const success = await exportMultipleToPhone(exportData);
-    if (success) {
-      toast.success(`${filteredContacts.length} contacts ready to save`);
+    try {
+      const success = await exportMultipleToPhone(exportData);
+      if (success) {
+        toast.success(`${filteredContacts.length} contacts ready to save`);
+      } else {
+        toast.error("Export cancelled");
+      }
+    } catch (error) {
+      console.error('Export failed:', error);
+      toast.error("Unable to export contacts. Please try again.");
     }
   };
 
