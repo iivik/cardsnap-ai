@@ -46,9 +46,16 @@ export function DrillDownModal({
   const handleExport = async () => {
     if (contacts.length === 0) return;
     
-    const success = await exportMultipleToPhone(contacts);
-    if (success) {
-      toast.success(`${contacts.length} contacts ready to save`);
+    try {
+      const success = await exportMultipleToPhone(contacts);
+      if (success) {
+        toast.success(`${contacts.length} contacts ready to save`);
+      } else {
+        toast.error("Export cancelled");
+      }
+    } catch (error) {
+      console.error('Export failed:', error);
+      toast.error("Unable to export contacts. Please try again.");
     }
   };
 

@@ -149,9 +149,16 @@ export default function ContactDetail() {
         <div className="flex gap-2">
           <button 
             onClick={async () => {
-              const success = await exportToPhoneContacts(contact);
-              if (success) {
-                sonnerToast.success("Contact ready to save to your phone");
+              try {
+                const success = await exportToPhoneContacts(contact);
+                if (success) {
+                  sonnerToast.success("Contact ready to save to your phone");
+                } else {
+                  sonnerToast.error("Export cancelled");
+                }
+              } catch (error) {
+                console.error('Export failed:', error);
+                sonnerToast.error("Unable to export contact. Please try again.");
               }
             }}
             className="p-2.5 rounded-xl glass-button"

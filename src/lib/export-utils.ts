@@ -87,9 +87,11 @@ export async function exportToPhoneContacts(contact: ExportContact): Promise<boo
           title: contact.name,
           text: `Contact: ${contact.name}`
         });
+        console.log('✓ Web Share API succeeded with MIME type:', mimeType);
         return true;
       } catch (err) {
         if ((err as Error).name === 'AbortError') {
+          console.log('Share cancelled by user');
           return false;
         }
         console.error('Share failed with MIME type:', mimeType, err);
@@ -98,7 +100,8 @@ export async function exportToPhoneContacts(contact: ExportContact): Promise<boo
     }
   }
   
-  // Fallback: download the file using data URI (better Android support)
+  console.log('Web Share API not available, falling back to download');
+  // Fallback: download the file using multi-layered approach
   downloadVCard(vcard, fileName);
   return true;
 }
@@ -122,9 +125,11 @@ export async function exportMultipleToPhone(contacts: ExportContact[]): Promise<
     if (navigator.share && navigator.canShare?.({ files: [file] })) {
       try {
         await navigator.share({ files: [file] });
+        console.log('✓ Web Share API succeeded with MIME type:', mimeType);
         return true;
       } catch (err) {
         if ((err as Error).name === 'AbortError') {
+          console.log('Share cancelled by user');
           return false;
         }
         console.error('Share failed with MIME type:', mimeType, err);
@@ -132,47 +137,107 @@ export async function exportMultipleToPhone(contacts: ExportContact[]): Promise<
     }
   }
   
-  // Fallback: download the file using data URI
+  console.log('Web Share API not available, falling back to download');
+  // Fallback: download the file using multi-layered approach
   downloadVCard(vcards, fileName);
   return true;
 }
 
 /**
- * Helper to download vCard using data URI (better Android browser support)
+ * Multi-layered download approach for better Android compatibility
+ * Strategy 1: Base64 Data URI (bypasses blob URL issues)
+ * Strategy 2: Blob with application/octet-stream (forces binary download)
+ * Strategy 3: Clipboard fallback with user instructions
  */
 function downloadVCard(vcardContent: string, fileName: string): void {
-  // Create blob with proper MIME type for Android
-  const blob = new Blob([vcardContent], { type: 'text/vcard;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = fileName;
-  a.style.display = 'none';
-  document.body.appendChild(a);
-  
-  // Trigger download with a slight delay for Android compatibility
-  setTimeout(() => {
-    a.click();
-  }, 50);
-  
-  // Cleanup
-  setTimeout(() => {
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  }, 1000);
+  // Strategy 1: Try Base64 Data URI (best for Android)
+  try {
+    const base64Content = btoa(unescape(encodeURIComponent(vcardContent)));
+    const dataUri = `data:text/x-vcard;charset=utf-8;base64,${base64Content}`;
+    
+    const a = document.createElement('a');
+    a.href = dataUri;
+    a.download = fileName;
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    
+    setTimeout(() => {
+      a.click();
+      console.log('✓ Base64 Data URI download triggered for:', fileName);
+    }, 50);
+    
+    setTimeout(() => {
+      if (document.body.contains(a)) {
+        document.body.removeChild(a);
+      }
+    }, 1000);
+    
+    return; // Exit after triggering download
+  } catch (e) {
+    console.error('Base64 Data URI failed:', e);
+  }
+
+  // Strategy 2: Try octet-stream blob (forces binary mode)
+  try {
+    const blob = new Blob([vcardContent], { type: 'application/octet-stream' });
+    const url = URL.createObjectURL(blob);
+    
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    
+    setTimeout(() => {
+      a.click();
+      console.log('✓ Octet-stream blob download triggered for:', fileName);
+    }, 50);
+    
+    setTimeout(() => {
+      if (document.body.contains(a)) {
+        document.body.removeChild(a);
+      }
+      URL.revokeObjectURL(url);
+    }, 1000);
+    
+    return; // Exit after triggering download
+  } catch (e) {
+    console.error('Octet-stream blob failed:', e);
+  }
+
+  // Strategy 3: Clipboard fallback (ultimate safety net)
+  console.warn('⚠ All download methods failed, trying clipboard');
+  copyVCardToClipboard(vcardContent, fileName);
 }
 
 /**
- * Helper to trigger file download (legacy fallback)
+ * Copy vCard to clipboard as ultimate fallback
  */
-function downloadBlob(blob: Blob, fileName: string): void {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = fileName;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+async function copyVCardToClipboard(vcardContent: string, fileName: string): Promise<void> {
+  try {
+    await navigator.clipboard.writeText(vcardContent);
+    console.log('✓ vCard copied to clipboard');
+    
+    // Show user instructions
+    alert(
+      `Download failed, but contact copied to clipboard!\n\n` +
+      `To save to your contacts:\n` +
+      `1. Open your Contacts app\n` +
+      `2. Tap "Import" or menu → "Import contacts"\n` +
+      `3. Choose "Import from file" or paste the contact\n\n` +
+      `File name: ${fileName}`
+    );
+  } catch (err) {
+    console.error('Clipboard copy failed:', err);
+    
+    // Last resort: show the vCard content
+    const userConfirm = confirm(
+      `Unable to save contact automatically.\n\n` +
+      `Would you like to see the contact data to copy manually?`
+    );
+    
+    if (userConfirm) {
+      prompt('Copy this vCard data:', vcardContent);
+    }
+  }
 }
