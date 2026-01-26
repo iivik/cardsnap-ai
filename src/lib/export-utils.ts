@@ -8,6 +8,7 @@ export interface ExportContact {
   location_city?: string | null;
   location_country?: string | null;
   handwritten_notes?: string | null;
+  category?: string | null;
 }
 
 /**
@@ -57,8 +58,21 @@ function generateVCard(contact: ExportContact): string {
     lines.push(`NOTE:${escape(contact.handwritten_notes)}`);
   }
   
-  // Add CardSnap tag for identification on iOS/Android
-  lines.push('CATEGORIES:CardSnap');
+  // Add CardSnap tag AND contact category for grouping
+  const categories = ['CardSnap'];
+  if (contact.category) {
+    const categoryLabels: Record<string, string> = {
+      'client': 'Client',
+      'prospect_client': 'Prospect',
+      'prospect_partner': 'Partner Lead',
+      'partner': 'Partner',
+      'influencer': 'Influencer',
+      'random': 'Contact',
+    };
+    const categoryLabel = categoryLabels[contact.category] || contact.category;
+    categories.push(categoryLabel);
+  }
+  lines.push(`CATEGORIES:${categories.join(',')}`);
   lines.push('END:VCARD');
 
   return lines.join('\r\n');

@@ -217,8 +217,7 @@ export default function ContactDetail() {
 
             <a 
               href={`mailto:${contact.email}`}
-              style={{ WebkitTapHighlightColor: 'transparent', textDecoration: 'none', color: 'inherit', display: 'flex' }}
-              className="flex items-center gap-3 -mx-2 px-2 py-1 rounded-lg active:bg-white/10 transition-colors touch-manipulation cursor-pointer"
+              className="flex items-center gap-3 -mx-2 px-2 py-1 rounded-lg active:bg-white/10 transition-colors touch-manipulation"
             >
               <div className="p-2 rounded-xl bg-primary/20">
                 <Mail className="h-5 w-5 text-primary" />
@@ -232,8 +231,7 @@ export default function ContactDetail() {
             {contact.phone && (
               <a 
                 href={`tel:${contact.phone}`}
-                style={{ WebkitTapHighlightColor: 'transparent', textDecoration: 'none', color: 'inherit', display: 'flex' }}
-                className="flex items-center gap-3 -mx-2 px-2 py-1 rounded-lg active:bg-white/10 transition-colors touch-manipulation cursor-pointer"
+                className="flex items-center gap-3 -mx-2 px-2 py-1 rounded-lg active:bg-white/10 transition-colors touch-manipulation"
               >
                 <div className="p-2 rounded-xl bg-primary/20">
                   <Phone className="h-5 w-5 text-primary" />
