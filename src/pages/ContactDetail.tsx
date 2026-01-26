@@ -215,72 +215,49 @@ export default function ContactDetail() {
               </div>
             </div>
 
-            <div className="flex items-center gap-3">
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  window.location.href = `mailto:${contact.email}`;
-                }}
-                className="p-2 rounded-xl bg-primary/20 active:scale-95 transition-transform touch-manipulation"
-                aria-label="Send email"
-              >
+            <a 
+              href={`mailto:${contact.email}`}
+              className="flex items-center gap-3 -mx-2 px-2 py-1 rounded-lg active:bg-white/10 transition-colors touch-manipulation"
+            >
+              <div className="p-2 rounded-xl bg-primary/20">
                 <Mail className="h-5 w-5 text-primary" />
-              </button>
-              <div 
-                className="flex-1 cursor-pointer"
-                onClick={() => window.location.href = `mailto:${contact.email}`}
-              >
-                <p className="text-sm text-muted-foreground">Email</p>
-                <p className="font-medium text-foreground">{contact.email}</p>
               </div>
-            </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm text-muted-foreground">Email</p>
+                <p className="font-medium text-foreground break-all">{contact.email}</p>
+              </div>
+            </a>
 
             {contact.phone && (
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    window.location.href = `tel:${contact.phone}`;
-                  }}
-                  className="p-2 rounded-xl bg-primary/20 active:scale-95 transition-transform touch-manipulation"
-                  aria-label="Call phone"
-                >
+              <a 
+                href={`tel:${contact.phone}`}
+                className="flex items-center gap-3 -mx-2 px-2 py-1 rounded-lg active:bg-white/10 transition-colors touch-manipulation"
+              >
+                <div className="p-2 rounded-xl bg-primary/20">
                   <Phone className="h-5 w-5 text-primary" />
-                </button>
-                <div 
-                  className="flex-1 cursor-pointer"
-                  onClick={() => window.location.href = `tel:${contact.phone}`}
-                >
+                </div>
+                <div className="flex-1">
                   <p className="text-sm text-muted-foreground">Phone</p>
                   <p className="font-medium text-foreground">{contact.phone}</p>
                 </div>
-              </div>
+              </a>
             )}
 
             {contact.address && (
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    const query = encodeURIComponent(contact.address || '');
-                    window.open(`https://www.google.com/maps/search/?api=1&query=${query}`, '_blank');
-                  }}
-                  className="p-2 rounded-xl bg-primary/20 active:scale-95 transition-transform touch-manipulation"
-                  aria-label="Open in maps"
-                >
+              <a 
+                href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(contact.address || '')}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-3 -mx-2 px-2 py-1 rounded-lg active:bg-white/10 transition-colors touch-manipulation"
+              >
+                <div className="p-2 rounded-xl bg-primary/20">
                   <MapPin className="h-5 w-5 text-primary" />
-                </button>
-                <div 
-                  className="flex-1 cursor-pointer"
-                  onClick={() => {
-                    const query = encodeURIComponent(contact.address || '');
-                    window.open(`https://www.google.com/maps/search/?api=1&query=${query}`, '_blank');
-                  }}
-                >
+                </div>
+                <div className="flex-1">
                   <p className="text-sm text-muted-foreground">Address</p>
                   <p className="font-medium text-foreground">{contact.address}</p>
                 </div>
-              </div>
+              </a>
             )}
           </div>
         </GlassCard>
