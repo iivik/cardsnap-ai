@@ -324,7 +324,7 @@ export default function BatchReview() {
         gps_longitude: locationData.longitude,
         location_city: locationData.city || null,
         location_country: locationData.country || null,
-        card_image_url: currentCard.imageUrl || null,
+        card_image_url: currentCard.imagePath || null,
       }]);
 
       if (error) throw error;
@@ -395,7 +395,7 @@ export default function BatchReview() {
           gps_longitude: locationData.longitude,
           location_city: locationData.city || null,
           location_country: locationData.country || null,
-          card_image_url: currentCard.imageUrl || null,
+          card_image_url: currentCard.imagePath || null,
         })
         .eq("id", duplicateContact.id);
 

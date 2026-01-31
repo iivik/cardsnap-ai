@@ -334,7 +334,7 @@ export default function Review() {
         gps_longitude: locationData.longitude,
         location_city: locationData.city || null,
         location_country: locationData.country || null,
-        card_image_url: imageUrl || null,
+        card_image_url: imagePath || null,
       }]).select().single();
 
       if (error) throw error;
@@ -398,7 +398,7 @@ export default function Review() {
           gps_longitude: locationData.longitude,
           location_city: locationData.city || null,
           location_country: locationData.country || null,
-          card_image_url: imageUrl || null,
+          card_image_url: imagePath || null,
         })
         .eq("id", duplicateContact.id);
 
