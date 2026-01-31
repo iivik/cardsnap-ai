@@ -114,13 +114,15 @@ export default function Scan() {
 
       if (error) throw error;
 
-      // Get public URL
-      const { data: urlData } = supabase.storage
+      // Get signed URL (bucket is private for security)
+      const { data: signedUrlData, error: signedUrlError } = await supabase.storage
         .from("card-images")
-        .getPublicUrl(data.path);
+        .createSignedUrl(data.path, 3600); // 1 hour expiry
+
+      if (signedUrlError) throw signedUrlError;
 
       return {
-        imageUrl: urlData.publicUrl,
+        imageUrl: signedUrlData.signedUrl,
         imagePath: data.path,
       };
     } catch (err) {
