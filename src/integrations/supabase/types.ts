@@ -302,6 +302,15 @@ export type Database = {
         }
         Returns: boolean
       }
+      validate_promo_code: {
+        Args: { code_to_check: string }
+        Returns: {
+          discount_type: Database["public"]["Enums"]["discount_type"]
+          discount_value: number
+          free_scans_bonus: number
+          is_valid: boolean
+        }[]
+      }
     }
     Enums: {
       app_role: "admin" | "user"
