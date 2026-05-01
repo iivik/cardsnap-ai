@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -12,6 +13,35 @@ serve(async (req) => {
   }
 
   try {
+    // Require authentication — prevents anonymous AI credit drain
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
+      return new Response(
+        JSON.stringify({ error: "Unauthorized" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const SUPABASE_URL_ENV = Deno.env.get("SUPABASE_URL");
+    const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY");
+    if (!SUPABASE_URL_ENV || !SUPABASE_ANON_KEY) {
+      return new Response(
+        JSON.stringify({ error: "Server configuration error" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const authClient = createClient(SUPABASE_URL_ENV, SUPABASE_ANON_KEY, {
+      global: { headers: { Authorization: authHeader } },
+    });
+    const token = authHeader.replace("Bearer ", "");
+    const { data: claimsData, error: claimsError } = await authClient.auth.getClaims(token);
+    if (claimsError || !claimsData?.claims?.sub) {
+      return new Response(
+        JSON.stringify({ error: "Unauthorized" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
     const { imageUrl } = await req.json();
 
     if (!imageUrl) {
@@ -21,20 +51,9 @@ serve(async (req) => {
       );
     }
 
-    // Validate image URL to prevent SSRF attacks
-    // Only allow signed URLs from our Supabase storage
-    const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
-    if (!SUPABASE_URL) {
-      console.error("SUPABASE_URL is not configured");
-      return new Response(
-        JSON.stringify({ error: "Server configuration error" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    // Validate URL format and domain
+    // Validate URL format and domain (SSRF protection)
     const expectedUrlPattern = new RegExp(
-      `^${SUPABASE_URL.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/storage/v1/object/sign/card-images/[a-f0-9-]+/`
+      `^${SUPABASE_URL_ENV.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/storage/v1/object/sign/card-images/[a-f0-9-]+/`
     );
     
     if (!expectedUrlPattern.test(imageUrl)) {

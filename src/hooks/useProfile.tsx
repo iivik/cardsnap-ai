@@ -99,17 +99,11 @@ export function useProfile() {
 
   const useScanCredit = async () => {
     if (!profile || profile.scan_credits <= 0) return false;
-    
-    try {
-      const { error } = await supabase
-        .from("profiles")
-        .update({
-          scan_credits: profile.scan_credits - 1,
-          total_scans_used: profile.total_scans_used + 1,
-        })
-        .eq("id", profile.id);
 
+    try {
+      const { data, error } = await supabase.rpc("decrement_scan_credit");
       if (error) throw error;
+      if (!data) return false;
       await fetchProfile();
       return true;
     } catch (err) {
