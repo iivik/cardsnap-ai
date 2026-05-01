@@ -51,20 +51,9 @@ serve(async (req) => {
       );
     }
 
-    // Validate image URL to prevent SSRF attacks
-    // Only allow signed URLs from our Supabase storage
-    const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
-    if (!SUPABASE_URL) {
-      console.error("SUPABASE_URL is not configured");
-      return new Response(
-        JSON.stringify({ error: "Server configuration error" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    // Validate URL format and domain
+    // Validate URL format and domain (SSRF protection)
     const expectedUrlPattern = new RegExp(
-      `^${SUPABASE_URL.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/storage/v1/object/sign/card-images/[a-f0-9-]+/`
+      `^${SUPABASE_URL_ENV.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/storage/v1/object/sign/card-images/[a-f0-9-]+/`
     );
     
     if (!expectedUrlPattern.test(imageUrl)) {
